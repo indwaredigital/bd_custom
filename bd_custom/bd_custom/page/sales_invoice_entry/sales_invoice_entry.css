@@ -1,0 +1,129 @@
+.invoice-entry-container {
+	min-height: 100vh;
+	background: #f9fafb;
+}
+
+.invoice-form {
+	animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.form-control:focus {
+	border-color: #2563eb;
+	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-control[tabindex="0"]:focus {
+	outline: none;
+	border-color: #2563eb;
+	box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-control[tabindex="0"]:hover {
+	border-color: #60a5fa;
+}
+
+/* Item row hover effect */
+.item-row>div:hover {
+	border-color: #60a5fa;
+}
+
+/* Button styles */
+.btn-save:hover {
+	background: #16a34a !important;
+	transform: translateY(-1px);
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn-cancel:hover {
+	background: #4b5563 !important;
+	transform: translateY(-1px);
+	box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* Dialog improvements */
+.modal-dialog {
+	max-width: 600px;
+}
+
+/* Smooth transitions */
+input,
+select,
+textarea,
+button {
+	transition: all 0.2s ease;
+}
+
+/* Grid layout for responsiveness */
+@media (max-width: 768px) {
+
+	.items-header,
+	.item-row {
+		grid-template-columns: 1fr !important;
+	}
+
+	.items-header>div,
+	.item-row>div,
+	.item-row>input {
+		margin-bottom: 8px;
+	}
+}
+
+/* Loading state */
+.btn-save:disabled::after {
+	content: '';
+	display: inline-block;
+	width: 12px;
+	height: 12px;
+	margin-left: 8px;
+	border: 2px solid #fff;
+	border-radius: 50%;
+	border-top-color: transparent;
+	animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+	outline: 2px solid #2563eb;
+	outline-offset: 2px;
+}
+
+/* Custom scrollbar */
+.form-body::-webkit-scrollbar {
+	width: 8px;
+}
+
+.form-body::-webkit-scrollbar-track {
+	background: #f1f1f1;
+}
+
+.form-body::-webkit-scrollbar-thumb {
+	background: #888;
+	border-radius: 4px;
+}
+
+.form-body::-webkit-scrollbar-thumb:hover {
+	background: #555;
+}

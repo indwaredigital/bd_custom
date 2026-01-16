@@ -1,0 +1,18 @@
+{
+    "content": null,
+    "creation": "2026-01-16 09:46:46.857667",
+    "docstatus": 0,
+    "doctype": "Page",
+    "idx": 0,
+    "modified": "2026-01-16 09:46:46.857667",
+    "modified_by": "Administrator",
+    "module": "BD Custom",
+    "name": "sales-invoice-entry",
+    "owner": "Administrator",
+    "page_name": "sales-invoice-entry",
+    "roles": [],
+    "script": null,
+    "standard": "Yes",
+    "style": null,
+    "system_page": 0
+}
