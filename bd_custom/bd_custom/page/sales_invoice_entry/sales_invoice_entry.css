@@ -1,4 +1,4 @@
-:root {
+.invoice-entry-container {
 	--primary-color: #111827;
 	--primary-dark: #000000;
 	--border-color: #e5e7eb;
@@ -86,11 +86,11 @@
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.form-group {
+.invoice-entry-container .form-group {
 	margin-bottom: 24px;
 }
 
-.form-group label {
+.invoice-entry-container .form-group label {
 	display: block;
 	font-size: 13px;
 	font-weight: 600;
@@ -99,7 +99,7 @@
 	text-transform: none;
 }
 
-.form-control {
+.invoice-entry-container .form-control {
 	min-height: 42px;
 	height: auto;
 	padding: 8px 14px;
@@ -111,19 +111,19 @@
 	color: var(--text-color);
 }
 
-.form-control:focus {
+.invoice-entry-container .form-control:focus {
 	border-color: var(--primary-color);
 	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
 	outline: none;
 	background-color: #fff;
 }
 
-.form-control::placeholder {
+.invoice-entry-container .form-control::placeholder {
 	color: var(--text-secondary);
 }
 
 /* Custom field styling */
-.custom-field {
+.invoice-entry-container .custom-field {
 	cursor: pointer;
 	display: flex;
 	align-items: center;
@@ -136,14 +136,14 @@
 	transition: all 0.2s ease;
 }
 
-.custom-field:hover {
+.invoice-entry-container .custom-field:hover {
 	background-color: var(--hover-color);
 	border-color: var(--primary-color);
 	transform: translateY(-1px);
 	box-shadow: var(--shadow-sm);
 }
 
-.custom-field:focus {
+.invoice-entry-container .custom-field:focus {
 	border-color: var(--primary-color);
 	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
 	outline: none;
@@ -289,7 +289,7 @@
 }
 
 /* Buttons */
-.btn {
+.invoice-entry-container .btn {
 	padding: 10px 24px;
 	font-size: 14px;
 	font-weight: 600;
@@ -300,37 +300,37 @@
 	box-shadow: var(--shadow-sm);
 }
 
-.btn:hover {
+.invoice-entry-container .btn:hover {
 	transform: translateY(-2px);
 	box-shadow: var(--shadow-md);
 }
 
-.btn:active {
+.invoice-entry-container .btn:active {
 	transform: translateY(0);
 }
 
-.btn-primary {
+.invoice-entry-container .btn-primary {
 	background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
 	color: #fff;
 }
 
-.btn-primary:hover {
+.invoice-entry-container .btn-primary:hover {
 	box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.3);
 }
 
-.btn-primary:disabled {
+.invoice-entry-container .btn-primary:disabled {
 	opacity: 0.6;
 	cursor: not-allowed;
 	transform: none;
 }
 
-.btn-secondary {
+.invoice-entry-container .btn-secondary {
 	background-color: #fff;
 	border-color: var(--border-color);
 	color: var(--text-color);
 }
 
-.btn-secondary:hover {
+.invoice-entry-container .btn-secondary:hover {
 	background-color: var(--hover-color);
 	border-color: var(--text-secondary);
 }
