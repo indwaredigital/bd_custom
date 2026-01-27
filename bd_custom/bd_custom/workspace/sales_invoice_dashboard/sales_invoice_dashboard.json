@@ -1,0 +1,34 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"eXXiqJqNSS\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Sales Invoice Dashboard\",\"col\":12}}]",
+ "creation": "2026-01-27 21:37:48.292684",
+ "custom_blocks": [
+  {
+   "custom_block_name": "Sales Invoice Dashboard",
+   "label": "Sales Invoice Dashboard"
+  }
+ ],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "sell",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "Sales Invoice Dashboard",
+ "links": [],
+ "modified": "2026-01-27 21:39:02.085110",
+ "modified_by": "Administrator",
+ "module": "BD Custom",
+ "name": "Sales Invoice Dashboard",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 8.0,
+ "shortcuts": [],
+ "title": "Sales Invoice Dashboard"
+}

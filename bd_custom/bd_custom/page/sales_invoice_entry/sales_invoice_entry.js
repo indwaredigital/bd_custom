@@ -16,6 +16,8 @@ class SalesInvoiceApp {
 			invoiceNo: '',
 			postingDate: frappe.datetime.get_today(),
 			customer: null,
+			shipping_address: null,
+			shipping_addresses: [],
 			items: [{
 				id: 1,
 				item_code: null,
@@ -32,7 +34,11 @@ class SalesInvoiceApp {
 			saving: false,
 			activeModal: null,
 			searchTerm: '',
-			selectedModalIndex: 0
+			selectedModalIndex: 0,
+			taxes: [],
+			net_total: 0,
+			total_taxes_and_charges: 0,
+			grand_total: 0
 		};
 
 		this.customers = [];
@@ -43,6 +49,7 @@ class SalesInvoiceApp {
 		this.loadData();
 		this.render();
 		this.attachEventListeners();
+		this.attachGlobalShortcuts();
 	}
 
 	loadData() {
@@ -77,6 +84,36 @@ class SalesInvoiceApp {
 		});
 	}
 
+	loadShippingAddresses(customerName) {
+		frappe.call({
+			method: 'frappe.client.get_list',
+			args: {
+				doctype: 'Address',
+				filters: [
+					['Dynamic Link', 'link_doctype', '=', 'Customer'],
+					['Dynamic Link', 'link_name', '=', customerName]
+				],
+				fields: ['name', 'address_line1', 'address_line2', 'city', 'state', 'pincode']
+			},
+			callback: (res) => {
+				if (res.message) {
+					const addresses = res.message;
+					this.state.shipping_addresses = addresses;
+
+					if (addresses.length === 1) {
+						this.state.shipping_address = addresses[0].name;
+						this.render();
+						this.attachEventListeners();
+						// Auto-focus first item field if only one address
+						setTimeout(() => $(this.container).find('.item-field').first().focus(), 100);
+					} else if (addresses.length > 1) {
+						// Auto-open address modal
+						this.setState({ activeModal: 'address', searchTerm: '', selectedModalIndex: 0 });
+					}
+				}
+			}
+		});
+	}
 	setState(newState) {
 		this.state = { ...this.state, ...newState };
 		this.render();
@@ -87,8 +124,19 @@ class SalesInvoiceApp {
 	updateTotalsOnly() {
 		const container = $(this.container);
 		container.find('#subtotal').text(this.calculateSubtotal().toFixed(2));
-		container.find('#total_tax').text(this.calculateTotalTax().toFixed(2));
 		container.find('#grand_total').text(this.calculateGrandTotal().toFixed(2));
+
+		// Dynamically render tax rows
+		const taxRowsContainer = container.find('#tax_rows');
+		if (taxRowsContainer.length) {
+			const taxHTML = this.state.taxes.map(tax => `
+				<div class="total-row">
+					<span>${tax.description}</span>
+					<span>₹${(tax.tax_amount || 0).toFixed(2)}</span>
+				</div>
+			`).join('');
+			taxRowsContainer.html(taxHTML);
+		}
 	}
 
 	// Update single line amount without full re-render
@@ -101,338 +149,230 @@ class SalesInvoiceApp {
 	}
 
 	render() {
-		const { invoiceNo, postingDate, customer, items, remarks, saving, activeModal, searchTerm, selectedModalIndex } = this.state;
+		const { invoiceNo, postingDate, customer, shipping_address, shipping_addresses, items, remarks, saving, activeModal, searchTerm, selectedModalIndex } = this.state;
 
 		this.container.innerHTML = `
-			<div class="invoice-entry-container" style="background: #f9fafb; padding: 20px; min-height: 100vh;">
-				<div class="invoice-form" style="max-width: 1200px; margin: 0 auto; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+			<div class="invoice-entry-container" id="invoice_entry_form">
+				<div class="invoice-form">
 					<!-- Header -->
-					<div class="form-header" style="background: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
-						<h2 style="margin: 0; font-size: 24px; font-weight: 600; color: white;">Sales Invoice</h2>
-						<p style="margin: 5px 0 0; font-size: 13px; opacity: 0.9;">Press F1 for Help | Tab to navigate | Enter to select</p>
+					<div class="form-header">
+						<h2>Sales Invoice</h2>
+						<div class="shortcuts-info">
+							<span><kbd>F2</kbd> Today</span>
+							<span><kbd>Enter</kbd> Navigate</span>
+							<span><kbd>↑↓</kbd> Move</span>
+							<span><kbd>Ctrl+S</kbd> Save</span>
+							<span><kbd>Esc</kbd> Cancel</span>
+						</div>
 					</div>
 
 					<!-- Form Body -->
-					<div class="form-body" style="padding: 24px;">
-						<!-- Invoice No & Date -->
+					<div class="form-body">
 						<div class="row mb-3">
-							<div class="col-md-6">
-								<label class="form-label" style="font-weight: 600; font-size: 13px; color: #374151; margin-bottom: 6px; display: block;">
-									Invoice No / ID
-								</label>
-								<input 
-									type="text" 
-									id="invoice_no" 
-									class="form-control" 
-									value="${invoiceNo}" 
-									placeholder="Auto-generated or enter custom"
-									autofocus
-								>
+							<div class="col-md-6 form-group">
+								<label>Invoice No / ID</label>
+								<input type="text" id="invoice_no" class="form-control" style="width: 100%;" value="${invoiceNo}" placeholder="Auto-generated (Enter to accept)">
 							</div>
-							<div class="col-md-6">
-								<label class="form-label" style="font-weight: 600; font-size: 13px; color: #374151; margin-bottom: 6px; display: block;">
-									Posting Date <span style="color: #2563eb; font-size: 11px;">(Press F2 for today)</span>
-								</label>
-								<input 
-									type="date" 
-									id="posting_date" 
-									class="form-control" 
-									value="${postingDate}"
-								>
+							<div class="col-md-6 form-group">
+								<label>Posting Date (F2 today)</label>
+								<input type="date" id="posting_date" class="form-control" style="width: 100%;" value="${postingDate}">
 							</div>
 						</div>
 
-						<!-- Customer -->
-						<div class="mb-3">
-							<label class="form-label" style="font-weight: 600; font-size: 13px; color: #374151; margin-bottom: 6px; display: block;">
-								Customer <span style="color: #2563eb; font-size: 11px;">(Press Enter to select)</span>
-							</label>
-							<div 
-								id="customer_field" 
-								class="form-control" 
-								tabindex="0" 
-								style="cursor: pointer; min-height: 50px; display: flex; align-items: center;"
-							>
-								${customer ? `
-									<div>
-										<div style="font-weight: 600;">${customer.customer_name}</div>
-										<div style="font-size: 11px; color: #6b7280;">${customer.name}${customer.tax_id ? ' | GSTIN: ' + customer.tax_id : ''}</div>
-									</div>
-								` : '<span style="color: #9ca3af;">Select Customer...</span>'}
-							</div>
-						</div>
-
-						<!-- Items Table -->
-						<div class="mb-3" style="border: 1px solid #e5e7eb; border-radius: 6px; overflow: hidden;">
-							<div style="background: #f9fafb; padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
-								<h4 style="margin: 0; font-size: 14px; font-weight: 600; color: #374151;">Invoice Items</h4>
-							</div>
-							<div style="padding: 16px;">
-								<!-- Table Header -->
-								<div style="display: grid; grid-template-columns: 3fr 2fr 2fr 2fr 3fr; gap: 8px; margin-bottom: 12px; font-size: 13px; font-weight: 600; color: #6b7280;">
-									<div>Item</div>
-									<div>Batch No</div>
-									<div>Quantity</div>
-									<div>Rate</div>
-									<div>Amount (Inc. Tax)</div>
+						<div class="row mb-3">
+							<div class="col-md-12 form-group">
+								<label>Customer</label>
+								<div id="customer_field" class="form-control custom-field" style="width: 100%;" tabindex="0">
+									${customer ? `
+										<div style="display: flex; flex-direction: column;">
+											<span class="modal-item-title">${customer.customer_name}</span>
+											<span class="modal-item-subtitle">${customer.name}</span>
+										</div>
+									` : '<span style="color: #9ca3af;">Select Customer (Enter to open list)...</span>'}
 								</div>
+							</div>
+						</div>
 
-								<!-- Items -->
+						${customer ? `
+							<div class="row mb-3 shipping-address-container">
+								<div class="col-md-12 form-group">
+									<label>Shipping Address</label>
+									<div id="address_field" class="form-control custom-field" style="width: 100%;" tabindex="0">
+										${shipping_address ? `
+											<div style="display: flex; flex-direction: column;">
+												<span class="modal-item-title">${shipping_address}</span>
+												<span class="modal-item-subtitle">${shipping_addresses.find(a => a.name === shipping_address)?.address_line1 || ''}</span>
+											</div>
+										` : '<span style="color: #9ca3af;">Select Shipping Address (Enter to open)...</span>'}
+									</div>
+								</div>
+							</div>
+						` : ''}
+						<!-- Items Table -->
+						<div class="items-table-container">
+							<div class="table-head">
+								<div>Item</div>
+								<div>Batch No</div>
+								<div>Qty</div>
+								<div>Rate</div>
+								<div>Amount (Inc. Tax)</div>
+							</div>
+							<div id="item-rows">
 								${items.map((item, index) => `
-									<div class="item-row" data-index="${index}" style="display: grid; grid-template-columns: 3fr 2fr 2fr 2fr 3fr; gap: 8px; margin-bottom: 12px;">
-										<!-- Item -->
-										<div 
-											class="item-field" 
-											data-index="${index}" 
-											tabindex="0" 
-											style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 13px; min-height: 38px; display: flex; align-items: center;"
-										>
-											<span style="color: ${item.item_name ? '#111827' : '#9ca3af'};">${item.item_name || 'Select Item...'}</span>
+									<div class="item-row" data-index="${index}">
+										<div class="item-field custom-field" data-index="${index}" tabindex="0">
+											<span style="color: ${item.item_name ? 'inherit' : '#9ca3af'};">${item.item_name || 'Select Item...'}</span>
 										</div>
-
-										<!-- Batch -->
-										<div 
-											class="batch-field" 
-											data-index="${index}" 
-											tabindex="0" 
-											style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 4px; cursor: ${item.item_code ? 'pointer' : 'not-allowed'}; background: ${item.item_code ? 'white' : '#f9fafb'}; font-size: 13px; min-height: 38px; display: flex; align-items: center;"
-										>
-											<span style="color: ${item.batch_no ? '#111827' : '#9ca3af'};">${item.batch_no || 'Batch...'}</span>
+										<div class="batch-field custom-field" data-index="${index}" tabindex="0" style="background: ${item.item_code ? 'inherit' : '#f9fafb'};">
+											<span style="color: ${item.batch_no ? 'inherit' : '#9ca3af'};">${item.batch_no || 'Batch...'}</span>
 										</div>
-
-										<!-- Quantity -->
-										<input 
-											type="number" 
-											class="form-control qty-input" 
-											data-index="${index}" 
-											value="${item.qty}" 
-											placeholder="Qty" 
-											style="font-size: 13px;" 
-											${!item.item_code ? 'disabled' : ''}
-										>
-
-										<!-- Rate -->
-										<input 
-											type="number" 
-											class="form-control rate-input" 
-											data-index="${index}" 
-											value="${item.rate}" 
-											placeholder="Rate" 
-											style="font-size: 13px;" 
-											${!item.item_code ? 'disabled' : ''}
-										>
-
-										<!-- Amount -->
-										<input 
-											type="number" 
-											class="form-control amount-display" 
-											data-index="${index}"
-											value="${item.total_amount.toFixed(2)}" 
-											placeholder="Total" 
-											readonly 
-											title="Base: ₹${item.amount.toFixed(2)} + Tax: ₹${item.tax_amount.toFixed(2)}"
-											style="font-size: 13px; font-weight: 600; background: #f9fafb;"
-										>
+										<input type="number" class="qty-input" data-index="${index}" value="${item.qty}" placeholder="0" ${!item.item_code ? 'disabled' : ''}>
+										<input type="number" class="rate-input" data-index="${index}" value="${item.rate}" placeholder="0.00" ${!item.item_code ? 'disabled' : ''}>
+										<input type="number" class="amount-display" data-index="${index}" value="${item.total_amount.toFixed(2)}" readonly>
 									</div>
 								`).join('')}
+							</div>
+						</div>
 
-								<!-- Totals -->
-								<div style="border-top: 1px solid #e5e7eb; margin-top: 16px; padding-top: 16px;">
-									<div style="display: flex; justify-content: flex-end;">
-										<div style="text-align: right;">
-											<div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">
-												Subtotal: ₹<span id="subtotal">${this.calculateSubtotal().toFixed(2)}</span>
-											</div>
-											<div style="font-size: 13px; color: #6b7280; margin-bottom: 8px;">
-												Tax (GST 18%): ₹<span id="total_tax">${this.calculateTotalTax().toFixed(2)}</span>
-											</div>
-											<div style="font-size: 18px; font-weight: 700; border-top: 1px solid #e5e7eb; padding-top: 8px;">
-												Grand Total: ₹<span id="grand_total">${this.calculateGrandTotal().toFixed(2)}</span>
-											</div>
-										</div>
-									</div>
+						<!-- Totals -->
+						<div class="totals-section">
+							<div class="totals-table">
+								<div class="total-row">
+									<span>Subtotal</span>
+									<span>₹<span id="subtotal">${this.calculateSubtotal().toFixed(2)}</span></span>
+								</div>
+								<div id="tax_rows"></div>
+								<div class="total-row grand-total">
+									<span>Grand Total</span>
+									<span>₹<span id="grand_total">${this.calculateGrandTotal().toFixed(2)}</span></span>
 								</div>
 							</div>
 						</div>
 
 						<!-- Remarks -->
-						<div class="mb-4">
-							<label class="form-label" style="font-weight: 600; font-size: 13px; color: #374151; margin-bottom: 6px; display: block;">
-								Remarks <span style="color: #2563eb; font-size: 11px;">(Press Ctrl+Enter to Save)</span>
-							</label>
-							<textarea 
-								id="remarks" 
-								class="form-control" 
-								rows="3" 
-								placeholder="Add any remarks or notes..."
-							>${remarks}</textarea>
+						<div class="form-group mt-4">
+							<label>Remarks</label>
+							<textarea id="remarks" class="form-control" style="width: 100%; height: 80px;" placeholder="Notes...">${remarks}</textarea>
 						</div>
 
-						<!-- Action Buttons -->
-						<div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid #e5e7eb;">
-							<button 
-								class="btn btn-success btn-save" 
-								style="padding: 10px 32px; font-weight: 600;"
-								${saving ? 'disabled' : ''}
-							>
-								<i class="fa fa-save"></i> ${saving ? 'Saving...' : 'Save Invoice'}
-							</button>
-							<button 
-								class="btn btn-secondary btn-cancel" 
-								style="padding: 10px 32px; font-weight: 600;"
-								${saving ? 'disabled' : ''}
-							>
-								<i class="fa fa-times"></i> Cancel
+						<!-- Actions -->
+						<div class="mt-4" style="display: flex; gap: 10px; justify-content: flex-end;">
+							<button class="btn btn-secondary btn-cancel">Cancel</button>
+							<button class="btn btn-primary btn-save" ${saving ? 'disabled' : ''}>
+								${saving ? 'Saving...' : 'Save'}
 							</button>
 						</div>
 					</div>
 				</div>
 
-				<!-- Custom Modals -->
 				${activeModal ? this.renderModal() : ''}
 			</div>
 		`;
 	}
 
 	renderModal() {
-		const { activeModal, searchTerm, selectedModalIndex } = this.state;
+		const { activeModal, searchTerm } = this.state;
 		let title = '';
-		let items = [];
 
-		if (activeModal === 'customer') {
-			title = 'Select Customer';
-			items = this.customers.filter(c =>
-				c.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				(c.tax_id && c.tax_id.toLowerCase().includes(searchTerm.toLowerCase()))
-			);
-		} else if (activeModal === 'item') {
-			title = 'Select Item';
-			items = this.items_list.filter(i =>
-				i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				i.name.toLowerCase().includes(searchTerm.toLowerCase())
-			);
-		} else if (activeModal === 'batch') {
-			title = 'Select Batch';
-			items = this.batches.filter(b =>
-				b.toLowerCase().includes(searchTerm.toLowerCase())
-			);
-		}
-
+		if (activeModal === 'customer') title = 'Select Customer';
+		else if (activeModal === 'item') title = 'Select Item';
+		else if (activeModal === 'batch') title = 'Select Batch';
+		else if (activeModal === 'address') title = 'Select Shipping Address';
 		return `
-			<div class="custom-modal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1050;">
-				<div style="background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 600px; max-height: 80vh; display: flex; flex-direction: column;">
-					<!-- Modal Header -->
-					<div style="display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid #e5e7eb; background: #2563eb; color: white; border-radius: 8px 8px 0 0;">
-						<h3 style="margin: 0; font-size: 18px; font-weight: 600;">${title}</h3>
-						<button class="modal-close" style="background: none; border: none; color: white; cursor: pointer; padding: 4px 8px; font-size: 20px;">&times;</button>
+			<div class="custom-modal-overlay">
+				<div class="custom-modal-content">
+					<div class="modal-header">
+						<h3 style="margin: 0; font-size: 16px;">${title}</h3>
+						<button class="modal-close btn-secondary" style="padding: 2px 8px; border: none;">&times;</button>
 					</div>
-
-					<!-- Search Box -->
-					<div style="padding: 16px; border-bottom: 1px solid #e5e7eb;">
-						<div style="position: relative;">
-							<i class="fa fa-search" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9ca3af;"></i>
-							<input 
-								type="text" 
-								id="modal_search" 
-								class="form-control" 
-								value="${searchTerm}" 
-								placeholder="Search..."
-								style="padding-left: 36px;"
-								autofocus
-							>
-						</div>
+					<div style="padding: 15px; border-bottom: 1px solid var(--border-color);">
+						<input type="text" id="modal_search" class="form-control" style="width: 100%;" value="${searchTerm}" placeholder="Search..." autofocus>
 					</div>
-
-					<!-- Modal Content -->
-					<div class="modal-items-list" style="flex: 1; overflow-y: auto; padding: 16px;">
-						${items.length === 0 ? '<div style="text-align: center; color: #9ca3af; padding: 40px;">No items found</div>' :
-				items.map((item, index) => {
-					if (activeModal === 'customer') {
-						return `
-										<div class="modal-item ${index === selectedModalIndex ? 'selected' : ''}" data-index="${index}" style="padding: 12px; border: 1px solid ${index === selectedModalIndex ? '#2563eb' : '#e5e7eb'}; border-radius: 6px; margin-bottom: 8px; cursor: pointer; background: ${index === selectedModalIndex ? '#eff6ff' : 'white'}; transition: all 0.2s;">
-											<div style="font-weight: 600; color: #111827;">${item.customer_name}</div>
-											<div style="font-size: 11px; color: #6b7280;">${item.name}${item.tax_id ? ' | GSTIN: ' + item.tax_id : ''}</div>
-										</div>
-									`;
-					} else if (activeModal === 'item') {
-						return `
-										<div class="modal-item ${index === selectedModalIndex ? 'selected' : ''}" data-index="${index}" style="padding: 12px; border: 1px solid ${index === selectedModalIndex ? '#2563eb' : '#e5e7eb'}; border-radius: 6px; margin-bottom: 8px; cursor: pointer; background: ${index === selectedModalIndex ? '#eff6ff' : 'white'}; transition: all 0.2s;">
-											<div style="display: flex; justify-content: space-between;">
-												<div>
-													<div style="font-weight: 600; color: #111827;">${item.item_name}</div>
-													<div style="font-size: 11px; color: #6b7280;">${item.name}</div>
-												</div>
-												<div style="text-align: right;">
-													<div style="color: #2563eb; font-weight: 600;">₹${item.standard_rate || 0}</div>
-													<div style="font-size: 11px; color: #6b7280;">${item.stock_uom}</div>
-												</div>
-											</div>
-										</div>
-									`;
-					} else if (activeModal === 'batch') {
-						return `
-										<div class="modal-item ${index === selectedModalIndex ? 'selected' : ''}" data-index="${index}" style="padding: 12px; border: 1px solid ${index === selectedModalIndex ? '#2563eb' : '#e5e7eb'}; border-radius: 6px; margin-bottom: 8px; cursor: pointer; background: ${index === selectedModalIndex ? '#eff6ff' : 'white'}; transition: all 0.2s;">
-											<div style="font-weight: 600; color: #111827;">${item}</div>
-										</div>
-									`;
-					}
-				}).join('')
-			}
+					<div class="modal-body" id="modal_results">
+						${this.getModalResultsHTML()}
 					</div>
 				</div>
 			</div>
 		`;
 	}
 
+	getModalResultsHTML() {
+		const { activeModal, searchTerm, selectedModalIndex } = this.state;
+		let list = [];
+
+		if (activeModal === 'customer') {
+			list = this.customers.filter(c =>
+				c.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+				c.name.toLowerCase().includes(searchTerm.toLowerCase())
+			);
+		} else if (activeModal === 'item') {
+			list = this.items_list.filter(i =>
+				i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+				i.name.toLowerCase().includes(searchTerm.toLowerCase())
+			);
+		} else if (activeModal === 'batch') {
+			list = this.batches.filter(b => b.toLowerCase().includes(searchTerm.toLowerCase()));
+		} else if (activeModal === 'address') {
+			list = this.state.shipping_addresses.filter(a =>
+				a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+				a.address_line1.toLowerCase().includes(searchTerm.toLowerCase())
+			);
+		}
+
+		if (list.length === 0) return '<div style="padding: 20px; text-align: center; color: var(--light-text);">No results</div>';
+
+		return list.map((item, index) => {
+			const isSelected = index === selectedModalIndex;
+			if (activeModal === 'customer') {
+				return `<div class="modal-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+					<div class="modal-item-title">${item.customer_name}</div>
+					<div class="modal-item-subtitle">${item.name}</div>
+				</div>`;
+			} else if (activeModal === 'item') {
+				return `<div class="modal-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+					<div class="modal-item-title">${item.item_name}</div>
+					<div class="modal-item-subtitle">${item.name} | ₹${item.standard_rate || 0}</div>
+				</div>`;
+			} else if (activeModal === 'address') {
+				return `<div class="modal-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+					<div class="modal-item-title">${item.name}</div>
+					<div class="modal-item-subtitle">${item.address_line1}</div>
+				</div>`;
+			} else {
+				return `<div class="modal-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+					<div class="modal-item-title">${item}</div>
+				</div>`;
+			}
+		}).join('');
+	}
+
+	renderModalResults() {
+		const container = $(this.container).find('#modal_results');
+		if (container.length) {
+			container.html(this.getModalResultsHTML());
+			this.attachModalItemListeners();
+		}
+	}
+
 	attachEventListeners() {
 		const container = $(this.container);
 
-		// Invoice No - no need to prevent re-render on input
-		container.find('#invoice_no').off('input keydown').on('input', (e) => {
-			this.state.invoiceNo = e.target.value; // Update state without re-render
-		}).on('keydown', (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				container.find('#posting_date').focus();
-			}
-		});
+		container.find('#invoice_no').on('input', (e) => this.state.invoiceNo = e.target.value);
+		container.find('#posting_date').on('change', (e) => this.state.postingDate = e.target.value);
 
-		// Posting Date
-		container.find('#posting_date').off('change keydown').on('change', (e) => {
-			this.state.postingDate = e.target.value; // Update state without re-render
-		}).on('keydown', (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				container.find('#customer_field').focus();
-			} else if (e.key === 'F2') {
-				e.preventDefault();
-				const today = frappe.datetime.get_today();
-				this.state.postingDate = today;
-				container.find('#posting_date').val(today);
-			}
-		});
-
-		// Customer Field
-		container.find('#customer_field').off('click keydown').on('click keydown', (e) => {
-			if (e.type === 'keydown' && e.key !== 'Enter') return;
-			e.preventDefault();
+		container.find('#customer_field').on('click', () => {
 			this.setState({ activeModal: 'customer', searchTerm: '', selectedModalIndex: 0 });
 		});
 
-		// Item Fields
-		container.find('.item-field').off('click keydown').on('click keydown', (e) => {
-			if (e.type === 'keydown' && e.key !== 'Enter') return;
-			e.preventDefault();
-			const index = parseInt($(e.currentTarget).data('index'));
-			this.activeLineIndex = index;
+		container.find('#address_field').on('click', () => {
+			this.setState({ activeModal: 'address', searchTerm: '', selectedModalIndex: 0 });
+		});
+		container.find('.item-field').on('click', (e) => {
+			this.activeLineIndex = parseInt($(e.currentTarget).data('index'));
 			this.setState({ activeModal: 'item', searchTerm: '', selectedModalIndex: 0 });
 		});
 
-		// Batch Fields
-		container.find('.batch-field').off('click keydown').on('click keydown', (e) => {
-			if (e.type === 'keydown' && e.key !== 'Enter') return;
-			e.preventDefault();
+		container.find('.batch-field').on('click', (e) => {
 			const index = parseInt($(e.currentTarget).data('index'));
 			const item = this.state.items[index];
 			if (item.item_code) {
@@ -441,195 +381,256 @@ class SalesInvoiceApp {
 			}
 		});
 
-		// Quantity Inputs - DON'T RE-RENDER on input, only update calculations
-		container.find('.qty-input').off('input keydown').on('input', (e) => {
+		container.find('.qty-input').on('input', (e) => {
 			const index = parseInt($(e.target).data('index'));
 			this.state.items[index].qty = e.target.value;
-			this.calculateLineAmount(index);
-		}).on('keydown', (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				const index = parseInt($(e.target).data('index'));
-				container.find(`.rate-input[data-index="${index}"]`).focus();
-			}
+			this.calculateLineAmount(index, false); // Pass false to not auto-add row on every qty input
 		});
 
-		// Rate Inputs - DON'T RE-RENDER on input, only update calculations
-		container.find('.rate-input').off('input keydown').on('input', (e) => {
+		container.find('.rate-input').on('input', (e) => {
 			const index = parseInt($(e.target).data('index'));
 			this.state.items[index].rate = e.target.value;
-			this.calculateLineAmount(index);
-		}).on('keydown', (e) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				const index = parseInt($(e.target).data('index'));
-				const item = this.state.items[index];
-				if (item.item_code && item.qty && item.amount > 0) {
-					this.addNewLine();
-					setTimeout(() => {
-						$(this.container).find('.item-row').last().find('.item-field').focus();
-					}, 100);
-				}
-			} else if (e.key === 'Tab' && !e.shiftKey) {
-				e.preventDefault();
-				container.find('#remarks').focus();
-			}
+			this.calculateLineAmount(index, false);
 		});
 
-		// Remarks
-		container.find('#remarks').off('input keydown').on('input', (e) => {
-			this.state.remarks = e.target.value; // Update state without re-render
-		}).on('keydown', (e) => {
-			if (e.ctrlKey && e.key === 'Enter') {
+		container.find('#remarks').on('input', (e) => this.state.remarks = e.target.value);
+
+		container.find('.btn-save').on('click', () => this.saveInvoice());
+		container.find('.btn-cancel').on('click', () => {
+			if (confirm('Discard changes?')) this.resetForm();
+		});
+
+		if (this.state.activeModal) {
+			container.find('.modal-close').on('click', () => this.setState({ activeModal: null }));
+
+			const modalSearch = container.find('#modal_search');
+			modalSearch.on('input', (e) => {
+				this.state.searchTerm = e.target.value;
+				this.state.selectedModalIndex = 0;
+				this.renderModalResults();
+			}).on('keydown', (e) => this.handleModalKeyDown(e));
+
+			// Force focus on search field
+			setTimeout(() => modalSearch.focus(), 100);
+
+			this.attachModalItemListeners();
+		}
+	}
+
+	attachModalItemListeners() {
+		$(this.container).find('.modal-item').on('click', (e) => {
+			this.handleModalItemSelect(parseInt($(e.currentTarget).data('index')));
+		});
+	}
+
+	attachGlobalShortcuts() {
+		$(window).off('keydown.invoice').on('keydown.invoice', (e) => {
+			// STRICT SCOPING: Only handle if target is within our app container OR a modal
+			const isWithinApp = $(e.target).closest('#invoice_entry_form, .custom-modal-overlay').length > 0;
+			if (!isWithinApp) return;
+
+			// Enter handling for navigation (except when selecting in search)
+			if (e.key === 'Enter') {
+				const target = $(e.target);
+
+				// If modal is open, let modal handler deal with it
+				if (this.state.activeModal) {
+					return;
+				}
+
+				if (target.id === 'invoice_no' || target.id === 'posting_date') {
+					e.preventDefault();
+					const next = target.id === 'invoice_no' ? '#posting_date' : '#customer_field';
+					$(this.container).find(next).focus();
+				} else if (target.id === 'customer_field' || target.closest('#customer_field').length) {
+					e.preventDefault();
+					this.setState({ activeModal: 'customer', searchTerm: '', selectedModalIndex: 0 });
+				} else if (target.id === 'address_field' || target.closest('#address_field').length) {
+					e.preventDefault();
+					this.setState({ activeModal: 'address', searchTerm: '', selectedModalIndex: 0 });
+				} else if (target.closest('.item-field').length) {
+					e.preventDefault();
+					const index = target.closest('.item-row').data('index');
+					this.activeLineIndex = index;
+					this.setState({ activeModal: 'item', searchTerm: '', selectedModalIndex: 0 });
+				} else if (target.closest('.batch-field').length) {
+					e.preventDefault();
+					const index = target.closest('.item-row').data('index');
+					const itm = this.state.items[index];
+					if (itm.item_code) {
+						this.activeLineIndex = index;
+						this.loadBatches(itm.item_code);
+					}
+				} else if (target.hasClass('rate-input')) {
+					e.preventDefault();
+					const index = target.data('index');
+
+					// Enter at rate input: Add row or move to next
+					if (index === this.state.items.length - 1 && this.state.items[index].item_code && parseFloat(this.state.items[index].qty) > 0) {
+						this.addNewLine();
+					} else if (index < this.state.items.length - 1) {
+						$(this.container).find(`.item-row[data-index="${index + 1}"] .item-field`).focus();
+					} else {
+						$(this.container).find('#remarks').focus();
+					}
+				}
+			}
+
+			// Tab handling for last row row addition
+			if (e.key === 'Tab' && !e.shiftKey) {
+				const target = $(e.target);
+				if (target.hasClass('rate-input')) {
+					const index = target.data('index');
+					if (index === this.state.items.length - 1 && this.state.items[index].item_code && parseFloat(this.state.items[index].qty) > 0) {
+						e.preventDefault();
+						this.addNewLine();
+					}
+				}
+			}
+
+			// Modal-specific Arrow Navigation (when modal search is focused)
+			if (this.state.activeModal && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+				e.preventDefault();
+				this.handleModalKeyDown(e);
+				return;
+			}
+
+			// Ctrl + S or Ctrl + Enter to Save - strictly within app form
+			if ((e.ctrlKey || e.metaKey) && (e.key === 's' || (e.key === 'Enter' && e.target.id !== 'modal_search' && !this.state.activeModal))) {
 				e.preventDefault();
 				this.saveInvoice();
 			}
-		});
 
-		// Save Button
-		container.find('.btn-save').off('click').on('click', () => {
-			this.saveInvoice();
-		});
+			// Esc handling
+			if (e.key === 'Escape') {
+				if (this.state.activeModal) {
+					e.preventDefault();
+					this.setState({ activeModal: null });
+				} else if (isWithinApp) {
+					if (confirm('Discard changes?')) this.resetForm();
+				}
+			}
 
-		// Cancel Button
-		container.find('.btn-cancel').off('click').on('click', () => {
-			if (confirm('Are you sure you want to cancel? All unsaved data will be lost.')) {
-				this.resetForm();
+			// F2 for Posting Date
+			if (e.key === 'F2') {
+				const activeId = e.target.id;
+				if (isWithinApp && (activeId === 'posting_date' || e.altKey)) {
+					e.preventDefault();
+					const today = frappe.datetime.get_today();
+					this.state.postingDate = today;
+					$(this.container).find('#posting_date').val(today).focus();
+				}
+			}
+
+			// Table Arrow keys navigation
+			if (!this.state.activeModal && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+				const focused = $(document.activeElement);
+				const row = focused.closest('.item-row');
+				if (row.length) {
+					e.preventDefault();
+					const index = row.data('index');
+					const nextIndex = e.key === 'ArrowDown' ? index + 1 : index - 1;
+					const nextRow = $(this.container).find(`.item-row[data-index="${nextIndex}"]`);
+					if (nextRow.length) {
+						const classList = focused.attr('class') ? focused.attr('class').split(' ') : [];
+						let selector = '';
+						if (classList.includes('item-field')) selector = '.item-field';
+						else if (classList.includes('batch-field')) selector = '.batch-field';
+						else if (classList.includes('qty-input')) selector = '.qty-input';
+						else if (classList.includes('rate-input')) selector = '.rate-input';
+
+						if (selector) nextRow.find(selector).focus();
+					}
+				}
 			}
 		});
-
-		// Modal Events
-		if (this.state.activeModal) {
-			// Modal close
-			container.find('.modal-close').off('click').on('click', () => {
-				this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
-			});
-
-			// Modal search
-			container.find('#modal_search').off('input keydown').on('input', (e) => {
-				this.setState({ searchTerm: e.target.value, selectedModalIndex: 0 });
-			}).on('keydown', (e) => {
-				this.handleModalKeyDown(e);
-			}).focus();
-
-			// Modal item clicks
-			container.find('.modal-item').off('click').on('click', (e) => {
-				const index = parseInt($(e.currentTarget).data('index'));
-				this.handleModalItemSelect(index);
-			});
-
-			// Click outside to close
-			container.find('.custom-modal').off('click').on('click', (e) => {
-				if ($(e.target).hasClass('custom-modal')) {
-					this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
-				}
-			});
-		}
 	}
 
 	handleModalKeyDown(e) {
 		const { activeModal, searchTerm, selectedModalIndex } = this.state;
-		let items = [];
 
+		let list = [];
 		if (activeModal === 'customer') {
-			items = this.customers.filter(c =>
-				c.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				(c.tax_id && c.tax_id.toLowerCase().includes(searchTerm.toLowerCase()))
-			);
+			list = this.customers.filter(c => c.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) || c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 		} else if (activeModal === 'item') {
-			items = this.items_list.filter(i =>
-				i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				i.name.toLowerCase().includes(searchTerm.toLowerCase())
-			);
+			list = this.items_list.filter(i => i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) || i.name.toLowerCase().includes(searchTerm.toLowerCase()));
 		} else if (activeModal === 'batch') {
-			items = this.batches.filter(b =>
-				b.toLowerCase().includes(searchTerm.toLowerCase())
-			);
+			list = this.batches.filter(b => b.toLowerCase().includes(searchTerm.toLowerCase()));
+		} else if (activeModal === 'address') {
+			list = this.state.shipping_addresses.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.address_line1.toLowerCase().includes(searchTerm.toLowerCase()));
 		}
 
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
-			const newIndex = Math.min(selectedModalIndex + 1, items.length - 1);
-			this.setState({ selectedModalIndex: newIndex });
+			const newIndex = Math.min(selectedModalIndex + 1, list.length - 1);
+			this.state.selectedModalIndex = newIndex;
+			this.renderModalResults();
 			this.scrollToSelected();
 		} else if (e.key === 'ArrowUp') {
 			e.preventDefault();
 			const newIndex = Math.max(selectedModalIndex - 1, 0);
-			this.setState({ selectedModalIndex: newIndex });
+			this.state.selectedModalIndex = newIndex;
+			this.renderModalResults();
 			this.scrollToSelected();
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
-			if (items.length > 0) {
-				this.handleModalItemSelect(selectedModalIndex);
+			if (list.length > 0) {
+				this.handleModalItemSelect(this.state.selectedModalIndex);
 			}
 		} else if (e.key === 'Escape') {
 			e.preventDefault();
-			this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
+			this.setState({ activeModal: null });
 		}
 	}
 
 	scrollToSelected() {
-		setTimeout(() => {
-			const container = $(this.container);
-			const selected = container.find('.modal-item.selected')[0];
-			if (selected) {
-				selected.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-			}
-		}, 50);
+		const selected = $(this.container).find('.modal-item.selected')[0];
+		if (selected) selected.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 	}
 
 	handleModalItemSelect(index) {
 		const { activeModal, searchTerm } = this.state;
+		let filtered = [];
 
 		if (activeModal === 'customer') {
-			const filtered = this.customers.filter(c =>
-				c.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				(c.tax_id && c.tax_id.toLowerCase().includes(searchTerm.toLowerCase()))
-			);
+			filtered = this.customers.filter(c => c.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) || c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 			if (filtered[index]) {
-				this.setState({
-					customer: filtered[index],
-					activeModal: null,
-					searchTerm: '',
-					selectedModalIndex: 0
-				});
+				const cust = filtered[index];
+				this.state.customer = cust;
+				this.loadShippingAddresses(cust.name);
+				this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
 			}
 		} else if (activeModal === 'item') {
-			const filtered = this.items_list.filter(i =>
-				i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				i.name.toLowerCase().includes(searchTerm.toLowerCase())
-			);
+			filtered = this.items_list.filter(i => i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) || i.name.toLowerCase().includes(searchTerm.toLowerCase()));
 			if (filtered[index]) {
-				const item = filtered[index];
+				const itm = filtered[index];
 				this.state.items[this.activeLineIndex] = {
 					...this.state.items[this.activeLineIndex],
-					item_code: item.name,
-					item_name: item.item_name,
-					rate: item.standard_rate || 0,
-					uom: item.stock_uom
+					item_code: itm.name,
+					item_name: itm.item_name,
+					rate: itm.standard_rate || 0,
+					uom: itm.stock_uom
 				};
-
-				if (item.has_batch_no) {
-					this.loadBatches(item.name);
+				if (itm.has_batch_no) {
+					this.loadBatches(itm.name);
 				} else {
 					this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
-					setTimeout(() => {
-						$(this.container).find(`.qty-input[data-index="${this.activeLineIndex}"]`).focus();
-					}, 100);
+					setTimeout(() => $(this.container).find(`.qty-input[data-index="${this.activeLineIndex}"]`).focus(), 50);
 				}
 			}
+		} else if (activeModal === 'address') {
+			filtered = this.state.shipping_addresses.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.address_line1.toLowerCase().includes(searchTerm.toLowerCase()));
+			if (filtered[index]) {
+				this.state.shipping_address = filtered[index].name;
+				this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
+				setTimeout(() => $(this.container).find('.item-field').first().focus(), 100);
+			}
 		} else if (activeModal === 'batch') {
-			const filtered = this.batches.filter(b =>
-				b.toLowerCase().includes(searchTerm.toLowerCase())
-			);
+			filtered = this.batches.filter(b => b.toLowerCase().includes(searchTerm.toLowerCase()));
 			if (filtered[index]) {
 				this.state.items[this.activeLineIndex].batch_no = filtered[index];
 				this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
-				setTimeout(() => {
-					$(this.container).find(`.qty-input[data-index="${this.activeLineIndex}"]`).focus();
-				}, 100);
+				setTimeout(() => $(this.container).find(`.qty-input[data-index="${this.activeLineIndex}"]`).focus(), 50);
 			}
 		}
 	}
@@ -639,11 +640,8 @@ class SalesInvoiceApp {
 			method: 'frappe.client.get_list',
 			args: {
 				doctype: 'Batch',
-				filters: {
-					item: itemCode
-				},
-				fields: ['name'],
-				limit_page_length: 0
+				filters: { item: itemCode },
+				fields: ['name']
 			},
 			callback: (r) => {
 				if (r.message) {
@@ -654,185 +652,114 @@ class SalesInvoiceApp {
 		});
 	}
 
-	calculateSubtotal() {
-		return this.state.items.reduce((sum, item) => sum + (item.amount || 0), 0);
+	calculateSubtotal() { return this.state.items.reduce((sum, i) => sum + (parseFloat(i.amount) || 0), 0); }
+	calculateTotalTax() { return this.state.total_taxes_and_charges || 0; }
+	calculateGrandTotal() { return this.state.grand_total || (this.calculateSubtotal() + this.calculateTotalTax()); }
+
+	calculateTaxesAndTotals() {
+		if (!this.state.customer) return;
+
+		const validItems = this.state.items.filter(i => i.item_code && parseFloat(i.qty) > 0);
+		if (validItems.length === 0) return;
+
+		const items = validItems.map(i => ({
+			item_code: i.item_code,
+			qty: parseFloat(i.qty),
+			rate: parseFloat(i.rate),
+			batch_no: i.batch_no
+		}));
+
+		frappe.call({
+			method: 'bd_custom.bd_custom.page.sales_invoice_entry.sales_invoice_entry.calculate_invoice_taxes',
+			args: {
+				customer: this.state.customer.name,
+				items: items,
+				posting_date: this.state.postingDate,
+				shipping_address_name: this.state.shipping_address
+			},
+			callback: (r) => {
+				if (r.message) {
+					this.state.taxes = r.message.taxes || [];
+					this.state.net_total = r.message.net_total || 0;
+					this.state.total_taxes_and_charges = r.message.total_taxes_and_charges || 0;
+					this.state.grand_total = r.message.grand_total || 0;
+					this.updateTotalsOnly();
+				}
+			}
+		});
 	}
 
-	calculateTotalTax() {
-		return this.state.items.reduce((sum, item) => sum + (item.tax_amount || 0), 0);
-	}
-
-	calculateGrandTotal() {
-		return this.calculateSubtotal() + this.calculateTotalTax();
-	}
-
-	calculateLineAmount(index) {
-		const item = this.state.items[index];
-		const qty = parseFloat(item.qty) || 0;
-		const rate = parseFloat(item.rate) || 0;
+	calculateLineAmount(index, autoAdd = true) {
+		const i = this.state.items[index];
+		const qty = parseFloat(i.qty) || 0;
+		const rate = parseFloat(i.rate) || 0;
 		const amount = qty * rate;
-		const taxAmount = amount * 0.18;
-		const totalAmount = amount + taxAmount;
-
-		this.state.items[index].amount = amount;
-		this.state.items[index].tax_amount = taxAmount;
-		this.state.items[index].total_amount = totalAmount;
-
-		// Update only the affected line and totals, don't re-render entire form
+		i.amount = amount;
 		this.updateLineAmount(index);
+
+		// Trigger server-side tax calculation
+		this.calculateTaxesAndTotals();
+
+		// Auto-add new row only if requested and last row is filled
+		if (autoAdd && index === this.state.items.length - 1 && i.item_code && qty > 0) {
+			this.addNewLine();
+		}
 	}
 
 	addNewLine() {
 		this.setState({
 			items: [...this.state.items, {
-				id: Date.now(),
-				item_code: null,
-				item_name: '',
-				batch_no: null,
-				qty: '',
-				rate: '',
-				uom: '',
-				amount: 0,
-				tax_amount: 0,
-				total_amount: 0
+				id: Date.now(), item_code: null, item_name: '', batch_no: null,
+				qty: '', rate: '', uom: '', amount: 0, tax_amount: 0, total_amount: 0
 			}]
 		});
+		// Focus the new row's item field
+		setTimeout(() => {
+			$(this.container).find('.item-row').last().find('.item-field').focus();
+		}, 100);
+	}
+
+	resetForm() {
+		window.location.reload();
 	}
 
 	validateInvoice() {
-		if (!this.state.customer) {
-			frappe.msgprint(__('Please select a customer'));
-			return false;
-		}
-
+		if (!this.state.customer) { frappe.msgprint(__('Select Customer')); return false; }
 		const validItems = this.state.items.filter(i => i.item_code && parseFloat(i.qty) > 0);
-		if (validItems.length === 0) {
-			frappe.msgprint(__('Please add at least one item with quantity'));
-			return false;
-		}
-
+		if (validItems.length === 0) { frappe.msgprint(__('Add at least one item')); return false; }
 		return true;
 	}
 
 	saveInvoice() {
 		if (!this.validateInvoice()) return;
+		this.setState({ saving: true });
 
-		frappe.confirm(
-			'Sure to save the Sales Invoice?',
-			() => this.showSaveOptions()
-		);
-	}
+		const invoiceData = {
+			doctype: 'Sales Invoice',
+			customer: this.state.customer.name,
+			posting_date: this.state.postingDate,
+			update_stock: 1,
+			shipping_address_name: this.state.shipping_address,
+			items: this.state.items.filter(i => i.item_code && parseFloat(i.qty) > 0).map(i => ({
+				item_code: i.item_code,
+				qty: parseFloat(i.qty),
+				rate: parseFloat(i.rate),
+				batch_no: i.batch_no
+			})),
+			remarks: this.state.remarks
+		};
 
-	showSaveOptions() {
-		const dialog = new frappe.ui.Dialog({
-			title: 'Choose save option',
-			fields: [{
-				fieldtype: 'HTML',
-				options: `
-					<div style="display: flex; flex-direction: column; gap: 12px; padding: 12px 0;">
-						<button class="btn btn-primary btn-block btn-save-close" style="padding: 12px; font-weight: 600;">
-							<i class="fa fa-save"></i> Save & Close
-						</button>
-						<button class="btn btn-success btn-block btn-save-new" style="padding: 12px; font-weight: 600;">
-							<i class="fa fa-plus"></i> Save & Create Another
-						</button>
-						<button class="btn btn-secondary btn-block" onclick="cur_dialog.hide();" style="padding: 12px; font-weight: 600;">
-							Cancel
-						</button>
-					</div>
-				`
-			}]
-		});
-
-		dialog.show();
-
-		dialog.$wrapper.find('.btn-save-close').on('click', () => {
-			this.performSave().then(() => {
-				dialog.hide();
-				frappe.set_route('List', 'Sales Invoice');
-			});
-		});
-
-		dialog.$wrapper.find('.btn-save-new').on('click', () => {
-			this.performSave().then(() => {
-				dialog.hide();
-				this.resetForm();
-			});
-		});
-	}
-
-	performSave() {
-		return new Promise((resolve, reject) => {
-			this.setState({ saving: true });
-
-			const validItems = this.state.items.filter(i => i.item_code && parseFloat(i.qty) > 0);
-
-			const invoiceData = {
-				doctype: 'Sales Invoice',
-				customer: this.state.customer.name,
-				customer_name: this.state.customer.customer_name,
-				posting_date: this.state.postingDate,
-				due_date: this.state.postingDate,
-				items: validItems.map(i => ({
-					item_code: i.item_code,
-					item_name: i.item_name,
-					batch_no: i.batch_no || undefined,
-					qty: parseFloat(i.qty),
-					rate: parseFloat(i.rate),
-					amount: i.amount,
-					uom: i.uom
-				})),
-				remarks: this.state.remarks
-			};
-
-			if (this.state.invoiceNo) {
-				invoiceData.naming_series = this.state.invoiceNo;
-			}
-
-			frappe.call({
-				method: 'frappe.client.insert',
-				args: { doc: invoiceData },
-				freeze: true,
-				freeze_message: __('Saving Sales Invoice...'),
-				callback: (r) => {
-					if (r.message) {
-						frappe.show_alert({
-							message: __('Sales Invoice {0} created successfully', [r.message.name]),
-							indicator: 'green'
-						}, 5);
-						this.setState({ saving: false });
-						resolve(r.message);
-					}
-				},
-				error: (r) => {
-					frappe.msgprint(__('Error saving Sales Invoice'));
-					this.setState({ saving: false });
-					reject(r);
+		frappe.call({
+			method: 'frappe.client.insert',
+			args: { doc: invoiceData },
+			callback: (r) => {
+				this.setState({ saving: false });
+				if (r.message) {
+					frappe.show_alert({ message: __('Invoice {0} saved', [r.message.name]), indicator: 'green' });
+					this.resetForm();
 				}
-			});
+			},
+			error: () => this.setState({ saving: false })
 		});
-	}
-
-	resetForm() {
-		this.setState({
-			invoiceNo: '',
-			postingDate: frappe.datetime.get_today(),
-			customer: null,
-			items: [{
-				id: 1,
-				item_code: null,
-				item_name: '',
-				batch_no: null,
-				qty: '',
-				rate: '',
-				uom: '',
-				amount: 0,
-				tax_amount: 0,
-				total_amount: 0
-			}],
-			remarks: '',
-			saving: false
-		});
-		setTimeout(() => $(this.container).find('#invoice_no').focus(), 100);
 	}
 }

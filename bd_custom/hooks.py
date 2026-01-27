@@ -21,6 +21,17 @@ app_license = "mit"
 # 	}
 # ]
 
+fixtures = [
+    {
+        "dt": "Workspace",
+        "filters": [["name", "in", ["Sales Invoice Dashboard"]]]
+    },
+    {
+        "dt": "Custom HTML Block",
+        "filters": [["name", "in", ["Sales Invoice Dashboard"]]]
+    }
+]
+
 # Includes in <head>
 # ------------------
 
