@@ -12,6 +12,8 @@
 	--shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 	--shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 	--shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+	--focus-color: #3b82f6;
+	--focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.4);
 }
 
 .invoice-entry-container {
@@ -112,10 +114,11 @@
 }
 
 .invoice-entry-container .form-control:focus {
-	border-color: var(--primary-color);
-	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+	border-color: var(--focus-color);
+	box-shadow: var(--focus-ring);
 	outline: none;
 	background-color: #fff;
+	transform: scale(1.005);
 }
 
 .invoice-entry-container .form-control::placeholder {
@@ -144,9 +147,10 @@
 }
 
 .invoice-entry-container .custom-field:focus {
-	border-color: var(--primary-color);
-	box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+	border-color: var(--focus-color);
+	box-shadow: var(--focus-ring);
 	outline: none;
+	transform: scale(1.005);
 }
 
 /* Items Table */
@@ -219,9 +223,10 @@
 }
 
 .item-row>input:focus {
-	background-color: #fafbfc;
+	background-color: #fff;
 	outline: none;
-	box-shadow: inset 2px 0 0 var(--text-color);
+	box-shadow: inset 3px 0 0 var(--focus-color), var(--focus-ring);
+	z-index: 1;
 }
 
 .item-row .item-field,
@@ -316,6 +321,12 @@
 
 .invoice-entry-container .btn-primary:hover {
 	box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.3);
+}
+
+.invoice-entry-container .btn:focus {
+	outline: none;
+	box-shadow: 0 0 0 2px #ffffff, 0 0 0 5px var(--focus-color);
+	transform: translateY(-2px);
 }
 
 .invoice-entry-container .btn-primary:disabled {
@@ -432,9 +443,10 @@
 
 .modal-item:hover,
 .modal-item.selected {
-	background-color: #f3f4f6;
-	border-left: 3px solid var(--text-color);
-	padding-left: 21px;
+	background-color: var(--hover-color);
+	border-left: 4px solid var(--focus-color);
+	padding-left: 20px;
+	box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.05);
 }
 
 .modal-item-title {
@@ -447,6 +459,35 @@
 .modal-item-subtitle {
 	font-size: 12px;
 	color: var(--text-secondary);
+}
+
+.stock-badge {
+	padding: 4px 10px;
+	border-radius: 20px;
+	font-size: 12px;
+	font-weight: 700;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	box-shadow: var(--shadow-sm);
+}
+
+.stock-badge-green {
+	background-color: #ecfdf5;
+	color: #059669;
+	border: 1px solid #10b981;
+}
+
+.stock-badge-red {
+	background-color: #fef2f2;
+	color: #dc2626;
+	border: 1px solid #f87171;
+}
+
+.modal-item.batch-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
 }
 
 /* Shipping Address styling */

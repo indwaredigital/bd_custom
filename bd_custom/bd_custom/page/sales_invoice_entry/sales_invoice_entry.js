@@ -378,7 +378,9 @@ class SalesInvoiceApp {
 				i.name.toLowerCase().includes(searchTerm.toLowerCase())
 			);
 		} else if (activeModal === 'batch') {
-			list = this.batches.filter(b => b.toLowerCase().includes(searchTerm.toLowerCase()));
+			list = this.batches.filter(b =>
+				b.name.toLowerCase().includes(searchTerm.toLowerCase())
+			);
 		} else if (activeModal === 'address') {
 			list = this.state.shipping_addresses.filter(a =>
 				a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -400,14 +402,21 @@ class SalesInvoiceApp {
 					<div class="modal-item-title">${item.item_name}</div>
 					<div class="modal-item-subtitle">${item.name} | ₹${item.standard_rate || 0}</div>
 				</div>`;
+			} else if (activeModal === 'batch') {
+				const qty = parseFloat(item.actual_qty) || 0;
+				const statusClass = qty <= 5 ? 'stock-badge-red' : 'stock-badge-green';
+				return `<div class="modal-item batch-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+					<div class="modal-item-info">
+						<div class="modal-item-title">${item.name}</div>
+					</div>
+					<div class="stock-badge ${statusClass}">
+						<i class="fa fa-cubes"></i> ${qty} Nos
+					</div>
+				</div>`;
 			} else if (activeModal === 'address') {
 				return `<div class="modal-item ${isSelected ? 'selected' : ''}" data-index="${index}">
 					<div class="modal-item-title">${item.name}</div>
 					<div class="modal-item-subtitle">${item.address_line1}</div>
-				</div>`;
-			} else {
-				return `<div class="modal-item ${isSelected ? 'selected' : ''}" data-index="${index}">
-					<div class="modal-item-title">${item}</div>
 				</div>`;
 			}
 		}).join('');
@@ -619,7 +628,7 @@ class SalesInvoiceApp {
 		} else if (activeModal === 'item') {
 			list = this.items_list.filter(i => i.item_name.toLowerCase().includes(searchTerm.toLowerCase()) || i.name.toLowerCase().includes(searchTerm.toLowerCase()));
 		} else if (activeModal === 'batch') {
-			list = this.batches.filter(b => b.toLowerCase().includes(searchTerm.toLowerCase()));
+			list = this.batches.filter(b => b.name.toLowerCase().includes(searchTerm.toLowerCase()));
 		} else if (activeModal === 'address') {
 			list = this.state.shipping_addresses.filter(a => a.name.toLowerCase().includes(searchTerm.toLowerCase()) || a.address_line1.toLowerCase().includes(searchTerm.toLowerCase()));
 		}
@@ -693,9 +702,9 @@ class SalesInvoiceApp {
 				setTimeout(() => $(this.container).find('.item-field').first().focus(), 100);
 			}
 		} else if (activeModal === 'batch') {
-			filtered = this.batches.filter(b => b.toLowerCase().includes(searchTerm.toLowerCase()));
+			filtered = this.batches.filter(b => b.name.toLowerCase().includes(searchTerm.toLowerCase()));
 			if (filtered[index]) {
-				this.state.items[this.activeLineIndex].batch_no = filtered[index];
+				this.state.items[this.activeLineIndex].batch_no = filtered[index].name;
 				this.calculateTaxesAndTotals(); // Sync rate/tax after batch select
 				this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
 				setTimeout(() => $(this.container).find(`.qty-input[data-index="${this.activeLineIndex}"]`).focus(), 50);
@@ -705,15 +714,11 @@ class SalesInvoiceApp {
 
 	loadBatches(itemCode) {
 		frappe.call({
-			method: 'frappe.client.get_list',
-			args: {
-				doctype: 'Batch',
-				filters: { item: itemCode },
-				fields: ['name']
-			},
+			method: 'bd_custom.bd_custom.page.sales_invoice_entry.sales_invoice_entry.get_batch_list',
+			args: { item_code: itemCode },
 			callback: (r) => {
 				if (r.message) {
-					this.batches = r.message.map(b => b.name);
+					this.batches = r.message;
 					this.setState({ activeModal: 'batch', searchTerm: '', selectedModalIndex: 0 });
 				}
 			}

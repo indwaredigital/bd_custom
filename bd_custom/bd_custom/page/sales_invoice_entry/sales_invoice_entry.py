@@ -3,6 +3,20 @@ from frappe import _
 import json
 
 @frappe.whitelist()
+def get_batch_list(item_code):
+	"""Fetch batches for an item from the Batch table directly."""
+	return frappe.db.sql("""
+		SELECT 
+			name,
+			ifnull(batch_qty, 0) as actual_qty
+		FROM `tabBatch`
+		WHERE item = %s 
+			AND disabled = 0
+			AND (expiry_date >= CURDATE() OR expiry_date IS NULL)
+		ORDER BY expiry_date ASC, name DESC
+	""", (item_code,), as_dict=1)
+
+@frappe.whitelist()
 def get_items_list():
 	"""Fetch items with their Standard Selling price."""
 	return frappe.db.sql("""
