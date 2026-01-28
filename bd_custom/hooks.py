@@ -24,7 +24,7 @@ app_license = "mit"
 fixtures = [
     {
         "dt": "Workspace",
-        "filters": [["name", "in", ["Sales Invoice Dashboard"]]]
+        "filters": [["name", "in", ["Invoicing"]]]
     },
     {
         "dt": "Custom HTML Block",
