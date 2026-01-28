@@ -28,7 +28,7 @@ fixtures = [
     },
     {
         "dt": "Custom HTML Block",
-        "filters": [["name", "in", ["Sales Invoice Dashboard"]]]
+        "filters": [["name", "in", ["Invoicing"]]]
     }
 ]
 

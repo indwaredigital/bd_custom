@@ -1,11 +1,11 @@
 {
  "charts": [],
- "content": "[{\"id\":\"eXXiqJqNSS\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Sales Invoice Dashboard\",\"col\":12}}]",
- "creation": "2026-01-28 11:45:15.257059",
+ "content": "[{\"id\":\"seZXvYB8No\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Invoicing\",\"col\":12}}]",
+ "creation": "2026-01-28 13:10:52.976516",
  "custom_blocks": [
   {
-   "custom_block_name": "Sales Invoice Dashboard",
-   "label": "Sales Invoice Dashboard"
+   "custom_block_name": "Invoicing",
+   "label": "Invoicing"
   }
  ],
  "docstatus": 0,
@@ -14,11 +14,11 @@
  "hide_custom": 0,
  "icon": "move",
  "idx": 0,
- "indicator_color": "",
+ "indicator_color": "orange",
  "is_hidden": 0,
  "label": "Invoicing",
  "links": [],
- "modified": "2026-01-28 12:40:54.742140",
+ "modified": "2026-01-28 13:13:35.217591",
  "modified_by": "Administrator",
  "module": "BD Custom",
  "name": "Invoicing",
