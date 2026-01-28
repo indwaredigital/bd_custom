@@ -36,9 +36,13 @@ class SalesInvoiceApp {
 			searchTerm: '',
 			selectedModalIndex: 0,
 			taxes: [],
+			taxes_and_charges: '',
 			net_total: 0,
 			total_taxes_and_charges: 0,
-			grand_total: 0
+			grand_total: 0,
+			rounded_total: 0,
+			rounding_adjustment: 0,
+			company: frappe.defaults.get_default("company")
 		};
 
 		this.customers = [];
@@ -50,6 +54,9 @@ class SalesInvoiceApp {
 		this.render();
 		this.attachEventListeners();
 		this.attachGlobalShortcuts();
+
+		// Initial focus
+		setTimeout(() => $(this.container).find('#invoice_no').focus(), 500);
 	}
 
 	loadData() {
@@ -68,14 +75,9 @@ class SalesInvoiceApp {
 			}
 		});
 
-		// Load items
+		// Load items with prices
 		frappe.call({
-			method: 'frappe.client.get_list',
-			args: {
-				doctype: 'Item',
-				fields: ['name', 'item_name', 'standard_rate', 'stock_uom', 'has_batch_no'],
-				limit_page_length: 0
-			},
+			method: 'bd_custom.bd_custom.page.sales_invoice_entry.sales_invoice_entry.get_items_list',
 			callback: (r) => {
 				if (r.message) {
 					this.items_list = r.message;
@@ -123,8 +125,28 @@ class SalesInvoiceApp {
 	// Only update totals without full re-render
 	updateTotalsOnly() {
 		const container = $(this.container);
-		container.find('#subtotal').text(this.calculateSubtotal().toFixed(2));
-		container.find('#grand_total').text(this.calculateGrandTotal().toFixed(2));
+		const subtotal = this.calculateSubtotal();
+		container.find('#subtotal').text(subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+		const roundingRow = container.find('#rounding_row');
+		const roundingAdjustment = this.state.rounding_adjustment || 0;
+		if (roundingAdjustment) {
+			roundingRow.show();
+			container.find('#rounding_adjustment').text(roundingAdjustment.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+		} else {
+			roundingRow.hide();
+		}
+
+		const grandTotal = this.state.rounded_total || this.state.grand_total || subtotal;
+		container.find('#grand_total').text(grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+
+		// Show template name if available
+		const templateDisplay = container.find('#tax_template_display');
+		if (this.state.taxes_and_charges) {
+			templateDisplay.text(this.state.taxes_and_charges).show();
+		} else {
+			templateDisplay.hide();
+		}
 
 		// Dynamically render tax rows
 		const taxRowsContainer = container.find('#tax_rows');
@@ -132,19 +154,34 @@ class SalesInvoiceApp {
 			const taxHTML = this.state.taxes.map(tax => `
 				<div class="total-row">
 					<span>${tax.description}</span>
-					<span>₹${(tax.tax_amount || 0).toFixed(2)}</span>
+					<span>₹${(tax.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
 				</div>
 			`).join('');
 			taxRowsContainer.html(taxHTML);
 		}
 	}
 
-	// Update single line amount without full re-render
+	refreshLineAmounts() {
+		this.state.items.forEach((item, index) => {
+			this.updateLineAmount(index);
+		});
+	}
+
+	// Update single line amount and rate without full re-render
 	updateLineAmount(index) {
 		const item = this.state.items[index];
 		const container = $(this.container);
+
+		// Update amount display
 		container.find(`.amount-display[data-index="${index}"]`).val(item.total_amount.toFixed(2));
-		container.find(`.amount-display[data-index="${index}"]`).attr('title', `Base: ₹${item.amount.toFixed(2)} + Tax: ₹${item.tax_amount.toFixed(2)}`);
+		container.find(`.amount-display[data-index="${index}"]`).attr('title', `Base: ₹${item.amount.toFixed(2)} + Tax: ₹${(item.total_amount - item.amount).toFixed(2)}`);
+
+		// Sync rate back to input if it changed (e.g. from server)
+		const rateInput = container.find(`.rate-input[data-index="${index}"]`);
+		if (parseFloat(rateInput.val()) !== parseFloat(item.rate)) {
+			rateInput.val(item.rate);
+		}
+
 		this.updateTotalsOnly();
 	}
 
@@ -159,8 +196,8 @@ class SalesInvoiceApp {
 						<h2>Sales Invoice</h2>
 						<div class="shortcuts-info">
 							<span><kbd>F2</kbd> Today</span>
-							<span><kbd>Enter</kbd> Navigate</span>
-							<span><kbd>↑↓</kbd> Move</span>
+							<span><kbd>Tab</kbd> Navigate</span>
+							<span><kbd>Enter</kbd> Select/New Row</span>
 							<span><kbd>Ctrl+S</kbd> Save</span>
 							<span><kbd>Esc</kbd> Cancel</span>
 						</div>
@@ -171,7 +208,7 @@ class SalesInvoiceApp {
 						<div class="row mb-3">
 							<div class="col-md-6 form-group">
 								<label>Invoice No / ID</label>
-								<input type="text" id="invoice_no" class="form-control" style="width: 100%;" value="${invoiceNo}" placeholder="Auto-generated (Enter to accept)">
+								<input type="text" id="invoice_no" class="form-control" style="width: 100%;" value="${invoiceNo}" placeholder="Auto-Generated or Enter Manually...">
 							</div>
 							<div class="col-md-6 form-group">
 								<label>Posting Date (F2 today)</label>
@@ -188,7 +225,7 @@ class SalesInvoiceApp {
 											<span class="modal-item-title">${customer.customer_name}</span>
 											<span class="modal-item-subtitle">${customer.name}</span>
 										</div>
-									` : '<span style="color: #9ca3af;">Select Customer (Enter to open list)...</span>'}
+									` : '<span style="color: #9ca3af;">Select Customer...</span>'}
 								</div>
 							</div>
 						</div>
@@ -203,7 +240,7 @@ class SalesInvoiceApp {
 												<span class="modal-item-title">${shipping_address}</span>
 												<span class="modal-item-subtitle">${shipping_addresses.find(a => a.name === shipping_address)?.address_line1 || ''}</span>
 											</div>
-										` : '<span style="color: #9ca3af;">Select Shipping Address (Enter to open)...</span>'}
+										` : '<span style="color: #9ca3af;">Select Shipping Address...</span>'}
 									</div>
 								</div>
 							</div>
@@ -228,7 +265,7 @@ class SalesInvoiceApp {
 										</div>
 										<input type="number" class="qty-input" data-index="${index}" value="${item.qty}" placeholder="0" ${!item.item_code ? 'disabled' : ''}>
 										<input type="number" class="rate-input" data-index="${index}" value="${item.rate}" placeholder="0.00" ${!item.item_code ? 'disabled' : ''}>
-										<input type="number" class="amount-display" data-index="${index}" value="${item.total_amount.toFixed(2)}" readonly>
+										<input type="number" class="amount-display" data-index="${index}" value="${item.total_amount.toFixed(2)}" readonly tabindex="-1">
 									</div>
 								`).join('')}
 							</div>
@@ -237,14 +274,26 @@ class SalesInvoiceApp {
 						<!-- Totals -->
 						<div class="totals-section">
 							<div class="totals-table">
+								<div id="tax_template_display" style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px; font-weight: 600; display: none;"></div>
 								<div class="total-row">
 									<span>Subtotal</span>
 									<span>₹<span id="subtotal">${this.calculateSubtotal().toFixed(2)}</span></span>
 								</div>
-								<div id="tax_rows"></div>
+								<div id="tax_rows">
+									${this.state.taxes.map(tax => `
+										<div class="total-row">
+											<span>${tax.description}</span>
+											<span>₹${(tax.tax_amount || 0).toFixed(2)}</span>
+										</div>
+									`).join('')}
+								</div>
+								<div class="total-row" id="rounding_row" style="display: ${this.state.rounding_adjustment ? 'flex' : 'none'};">
+									<span>Rounding Adjustment</span>
+									<span>₹<span id="rounding_adjustment">${(this.state.rounding_adjustment || 0).toFixed(2)}</span></span>
+								</div>
 								<div class="total-row grand-total">
 									<span>Grand Total</span>
-									<span>₹<span id="grand_total">${this.calculateGrandTotal().toFixed(2)}</span></span>
+									<span>₹<span id="grand_total">${(this.state.rounded_total || this.state.grand_total || this.calculateSubtotal()).toFixed(2)}</span></span>
 								</div>
 							</div>
 						</div>
@@ -271,13 +320,31 @@ class SalesInvoiceApp {
 	}
 
 	renderModal() {
-		const { activeModal, searchTerm } = this.state;
+		const { activeModal, searchTerm, saving } = this.state;
 		let title = '';
 
 		if (activeModal === 'customer') title = 'Select Customer';
 		else if (activeModal === 'item') title = 'Select Item';
 		else if (activeModal === 'batch') title = 'Select Batch';
 		else if (activeModal === 'address') title = 'Select Shipping Address';
+		else if (activeModal === 'save_options') return `
+			<div class="custom-modal-overlay">
+				<div class="custom-modal-content" style="max-width: 400px; padding-top: 10px;">
+					<div class="modal-header">
+						<h3 style="margin: 0; font-size: 16px;">Save Invoice</h3>
+						<button class="modal-close btn-secondary" style="padding: 2px 8px; border: none;">&times;</button>
+					</div>
+					<div class="modal-body" style="padding: 30px; text-align: center; display: flex; flex-direction: column; gap: 15px;">
+						<button class="btn btn-primary btn-save-new" style="padding: 12px;" ${saving ? 'disabled' : ''}>
+							<i class="fa fa-plus"></i> ${saving ? 'Saving...' : 'Save & Create New'}
+						</button>
+						<button class="btn btn-secondary btn-save-close" style="padding: 12px;" ${saving ? 'disabled' : ''}>
+							<i class="fa fa-check"></i> ${saving ? 'Saving...' : 'Save & Close'}
+						</button>
+					</div>
+				</div>
+			</div>
+		`;
 		return `
 			<div class="custom-modal-overlay">
 				<div class="custom-modal-content">
@@ -393,15 +460,38 @@ class SalesInvoiceApp {
 			this.calculateLineAmount(index, false);
 		});
 
+		// Auto-select text on focus for numeric inputs
+		container.find('.qty-input, .rate-input, #invoice_no').on('focus', (e) => {
+			setTimeout(() => e.target.select(), 50);
+		});
+
 		container.find('#remarks').on('input', (e) => this.state.remarks = e.target.value);
 
-		container.find('.btn-save').on('click', () => this.saveInvoice());
-		container.find('.btn-cancel').on('click', () => {
-			if (confirm('Discard changes?')) this.resetForm();
+		container.find('.btn-save').on('click', () => {
+			if (this.validateInvoice()) {
+				this.setState({ activeModal: 'save_options' });
+			}
 		});
+
+		container.find('.btn-save-close').on('click', () => this.executeSave('close'));
+		container.find('.btn-save-new').on('click', () => this.executeSave('new'));
 
 		if (this.state.activeModal) {
 			container.find('.modal-close').on('click', () => this.setState({ activeModal: null }));
+
+			if (this.state.activeModal === 'save_options') {
+				// Focus the first button for quick Enter key save
+				setTimeout(() => container.find('.btn-save-new').focus(), 100);
+
+				// Add arrow key navigation for save buttons
+				container.find('.btn-save-new, .btn-save-close').on('keydown', (e) => {
+					if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+						e.preventDefault();
+						const isNew = $(e.target).hasClass('btn-save-new');
+						container.find(isNew ? '.btn-save-close' : '.btn-save-new').focus();
+					}
+				});
+			}
 
 			const modalSearch = container.find('#modal_search');
 			modalSearch.on('input', (e) => {
@@ -438,11 +528,7 @@ class SalesInvoiceApp {
 					return;
 				}
 
-				if (target.id === 'invoice_no' || target.id === 'posting_date') {
-					e.preventDefault();
-					const next = target.id === 'invoice_no' ? '#posting_date' : '#customer_field';
-					$(this.container).find(next).focus();
-				} else if (target.id === 'customer_field' || target.closest('#customer_field').length) {
+				if (target.id === 'customer_field' || target.closest('#customer_field').length) {
 					e.preventDefault();
 					this.setState({ activeModal: 'customer', searchTerm: '', selectedModalIndex: 0 });
 				} else if (target.id === 'address_field' || target.closest('#address_field').length) {
@@ -462,25 +548,9 @@ class SalesInvoiceApp {
 						this.loadBatches(itm.item_code);
 					}
 				} else if (target.hasClass('rate-input')) {
-					e.preventDefault();
 					const index = target.data('index');
 
-					// Enter at rate input: Add row or move to next
-					if (index === this.state.items.length - 1 && this.state.items[index].item_code && parseFloat(this.state.items[index].qty) > 0) {
-						this.addNewLine();
-					} else if (index < this.state.items.length - 1) {
-						$(this.container).find(`.item-row[data-index="${index + 1}"] .item-field`).focus();
-					} else {
-						$(this.container).find('#remarks').focus();
-					}
-				}
-			}
-
-			// Tab handling for last row row addition
-			if (e.key === 'Tab' && !e.shiftKey) {
-				const target = $(e.target);
-				if (target.hasClass('rate-input')) {
-					const index = target.data('index');
+					// Enter at rate input: ONLY Add row if it's the last row
 					if (index === this.state.items.length - 1 && this.state.items[index].item_code && parseFloat(this.state.items[index].qty) > 0) {
 						e.preventDefault();
 						this.addNewLine();
@@ -488,12 +558,6 @@ class SalesInvoiceApp {
 				}
 			}
 
-			// Modal-specific Arrow Navigation (when modal search is focused)
-			if (this.state.activeModal && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
-				e.preventDefault();
-				this.handleModalKeyDown(e);
-				return;
-			}
 
 			// Ctrl + S or Ctrl + Enter to Save - strictly within app form
 			if ((e.ctrlKey || e.metaKey) && (e.key === 's' || (e.key === 'Enter' && e.target.id !== 'modal_search' && !this.state.activeModal))) {
@@ -598,6 +662,7 @@ class SalesInvoiceApp {
 				const cust = filtered[index];
 				this.state.customer = cust;
 				this.loadShippingAddresses(cust.name);
+				this.calculateTaxesAndTotals();
 				this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
 			}
 		} else if (activeModal === 'item') {
@@ -608,12 +673,14 @@ class SalesInvoiceApp {
 					...this.state.items[this.activeLineIndex],
 					item_code: itm.name,
 					item_name: itm.item_name,
-					rate: itm.standard_rate || 0,
+					qty: this.state.items[this.activeLineIndex].qty || 1, // Default qty to 1
+					rate: itm.standard_rate || 0, // Use the fetched price
 					uom: itm.stock_uom
 				};
 				if (itm.has_batch_no) {
 					this.loadBatches(itm.name);
 				} else {
+					this.calculateTaxesAndTotals(); // Trigger rate fetch
 					this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
 					setTimeout(() => $(this.container).find(`.qty-input[data-index="${this.activeLineIndex}"]`).focus(), 50);
 				}
@@ -629,6 +696,7 @@ class SalesInvoiceApp {
 			filtered = this.batches.filter(b => b.toLowerCase().includes(searchTerm.toLowerCase()));
 			if (filtered[index]) {
 				this.state.items[this.activeLineIndex].batch_no = filtered[index];
+				this.calculateTaxesAndTotals(); // Sync rate/tax after batch select
 				this.setState({ activeModal: null, searchTerm: '', selectedModalIndex: 0 });
 				setTimeout(() => $(this.container).find(`.qty-input[data-index="${this.activeLineIndex}"]`).focus(), 50);
 			}
@@ -660,7 +728,13 @@ class SalesInvoiceApp {
 		if (!this.state.customer) return;
 
 		const validItems = this.state.items.filter(i => i.item_code && parseFloat(i.qty) > 0);
-		if (validItems.length === 0) return;
+		if (validItems.length === 0) {
+			// Clear taxes if no items
+			this.state.taxes = [];
+			this.state.taxes_and_charges = '';
+			this.updateTotalsOnly();
+			return;
+		}
 
 		const items = validItems.map(i => ({
 			item_code: i.item_code,
@@ -675,15 +749,35 @@ class SalesInvoiceApp {
 				customer: this.state.customer.name,
 				items: items,
 				posting_date: this.state.postingDate,
-				shipping_address_name: this.state.shipping_address
+				shipping_address_name: this.state.shipping_address,
+				company: this.state.company
 			},
 			callback: (r) => {
 				if (r.message) {
 					this.state.taxes = r.message.taxes || [];
+					this.state.taxes_and_charges = r.message.taxes_and_charges || '';
 					this.state.net_total = r.message.net_total || 0;
 					this.state.total_taxes_and_charges = r.message.total_taxes_and_charges || 0;
 					this.state.grand_total = r.message.grand_total || 0;
+					this.state.rounded_total = r.message.rounded_total || 0;
+					this.state.rounding_adjustment = r.message.rounding_adjustment || 0;
+
+					// Sync calculated item amounts (important for inclusive taxes and auto-populating rates)
+					if (r.message.items) {
+						r.message.items.forEach((calc_item, i) => {
+							if (this.state.items[i]) {
+								this.state.items[i].amount = calc_item.amount;
+								this.state.items[i].total_amount = calc_item.total_amount;
+								// Update rate if server provided a different one (e.g. from Price List)
+								if (calc_item.rate && (!this.state.items[i].rate || parseFloat(this.state.items[i].rate) === 0)) {
+									this.state.items[i].rate = calc_item.rate;
+								}
+							}
+						});
+					}
+
 					this.updateTotalsOnly();
+					this.refreshLineAmounts();
 				}
 			}
 		});
@@ -695,6 +789,7 @@ class SalesInvoiceApp {
 		const rate = parseFloat(i.rate) || 0;
 		const amount = qty * rate;
 		i.amount = amount;
+		i.total_amount = amount; // Local fallback
 		this.updateLineAmount(index);
 
 		// Trigger server-side tax calculation
@@ -730,16 +825,15 @@ class SalesInvoiceApp {
 		return true;
 	}
 
-	saveInvoice() {
-		if (!this.validateInvoice()) return;
+	executeSave(action) {
 		this.setState({ saving: true });
 
 		const invoiceData = {
-			doctype: 'Sales Invoice',
 			customer: this.state.customer.name,
 			posting_date: this.state.postingDate,
-			update_stock: 1,
 			shipping_address_name: this.state.shipping_address,
+			taxes_and_charges: this.state.taxes_and_charges,
+			company: this.state.company,
 			items: this.state.items.filter(i => i.item_code && parseFloat(i.qty) > 0).map(i => ({
 				item_code: i.item_code,
 				qty: parseFloat(i.qty),
@@ -750,16 +844,25 @@ class SalesInvoiceApp {
 		};
 
 		frappe.call({
-			method: 'frappe.client.insert',
+			method: 'bd_custom.bd_custom.page.sales_invoice_entry.sales_invoice_entry.save_sales_invoice',
 			args: { doc: invoiceData },
 			callback: (r) => {
-				this.setState({ saving: false });
+				this.setState({ saving: false, activeModal: null });
 				if (r.message) {
-					frappe.show_alert({ message: __('Invoice {0} saved', [r.message.name]), indicator: 'green' });
-					this.resetForm();
+					frappe.show_alert({ message: __('Invoice {0} saved', [r.message]), indicator: 'green' });
+					if (action === 'new') {
+						this.resetForm();
+					} else {
+						// Close / Redirect back to list
+						frappe.set_route('List', 'Sales Invoice');
+					}
 				}
 			},
 			error: () => this.setState({ saving: false })
 		});
+	}
+
+	saveInvoice() {
+		this.setState({ activeModal: 'save_options' });
 	}
 }
