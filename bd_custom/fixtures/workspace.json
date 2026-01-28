@@ -1,11 +1,11 @@
 [
  {
   "charts": [],
-  "content": "[{\"id\":\"eXXiqJqNSS\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Sales Invoice Dashboard\",\"col\":12}}]",
+  "content": "[{\"id\":\"D6u8fPcvbx\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"Invoicing\",\"col\":12}}]",
   "custom_blocks": [
    {
-    "custom_block_name": "Sales Invoice Dashboard",
-    "label": "Sales Invoice Dashboard",
+    "custom_block_name": "Invoicing",
+    "label": "Invoicing",
     "parent": "Invoicing",
     "parentfield": "custom_blocks",
     "parenttype": "Workspace"
@@ -16,12 +16,12 @@
   "for_user": "",
   "hide_custom": 0,
   "icon": "move",
-  "indicator_color": "",
+  "indicator_color": "green",
   "is_hidden": 0,
   "label": "Invoicing",
   "links": [],
-  "modified": "2026-01-28 12:40:54.742140",
-  "module": "BD Custom",
+  "modified": "2026-01-28 13:43:20.046150",
+  "module": null,
   "name": "Invoicing",
   "number_cards": [],
   "parent_page": "",
@@ -29,7 +29,7 @@
   "quick_lists": [],
   "restrict_to_domain": null,
   "roles": [],
-  "sequence_id": 8.0,
+  "sequence_id": 9.0,
   "shortcuts": [],
   "title": "Invoicing"
  }
