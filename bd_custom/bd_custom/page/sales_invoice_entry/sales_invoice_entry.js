@@ -524,7 +524,7 @@ class SalesInvoiceApp {
 							<tbody>
 								<tr>
 									<td style="width: 40%; font-weight: 600; color: var(--text-regular);">GSTIN / UIN</td>
-									<td>${this.state.customer.tax_id || "-"}</td>
+									<td>${this.state.customer.gstin || this.state.customer.tax_id || "-"}</td>
 								</tr>
 								<tr>
 									<td style="font-weight: 600; color: var(--text-regular);">PAN</td>
@@ -542,7 +542,7 @@ class SalesInvoiceApp {
 							<table class="table table-bordered" style="margin: 0; font-size: 13px; margin-bottom: 15px;">
 								<tbody>
 									<tr>
-										<td style="width: 40%; font-weight: 600; color: var(--text-regular);">Drug Lic No.</td>
+										<td style="width: 40%; font-weight: 600; color: var(--text-regular);">Drug Lic. No.</td>
 										<td>${this.state.customer.custom_drug_lic_no || "-"}</td>
 									</tr>
 									<tr>
