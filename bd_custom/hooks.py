@@ -22,14 +22,8 @@ app_license = "mit"
 # ]
 
 fixtures = [
-    {
-        "dt": "Workspace",
-        "filters": [["name", "in", ["Invoicing"]]]
-    },
-    {
-        "dt": "Custom HTML Block",
-        "filters": [["name", "in", ["Invoicing"]]]
-    }
+	{"dt": "Workspace", "filters": [["name", "in", ["Invoicing"]]]},
+	{"dt": "Custom HTML Block", "filters": [["name", "in", ["Invoicing"]]]},
 ]
 
 # Includes in <head>
@@ -257,4 +251,3 @@ fixtures = [
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-
