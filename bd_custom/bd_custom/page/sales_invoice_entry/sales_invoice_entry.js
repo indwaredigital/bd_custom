@@ -257,6 +257,7 @@ class SalesInvoiceApp {
 							<span><kbd>Tab</kbd> Next</span>
 							<span><kbd>Shift+Tab</kbd> Previous</span>
 							<span><kbd>Enter</kbd> Select/New Row</span>
+							<span><kbd>Shift+Enter</kbd> View Details</span>
 							<span><kbd>Ctrl+S</kbd> Save</span>
 							<span><kbd>Esc</kbd> Cancel</span>
 						</div>
@@ -268,13 +269,12 @@ class SalesInvoiceApp {
 							<div class="col-md-12 form-group">
 								<label>Sales Account</label>
 								<div id="sales_account_field" class="form-control custom-field" style="width: 100%; background-color: #f9fafb; cursor: pointer;" tabindex="0">
-									${
-										this.state.sales_account
-											? `
+									${this.state.sales_account
+				? `
 										<span style="font-weight: 600;">${this.state.sales_account}</span>
 									`
-											: '<span style="color: #9ca3af;">Select Sales Account...</span>'
-									}
+				: '<span style="color: #9ca3af;">Select Sales Account...</span>'
+			}
 								</div>
 							</div>
 						</div>
@@ -294,31 +294,28 @@ class SalesInvoiceApp {
 							<div class="col-md-12 form-group">
 								<label>Customer</label>
 								<div id="customer_field" class="form-control custom-field" style="width: 100%;" tabindex="0">
-									${
-										customer
-											? `
+									${customer
+				? `
 										<div style="display: flex; flex-direction: column; position: relative; padding-right: 25px;">
 											<span class="modal-item-title">${customer.customer_name}</span>
 											<span class="modal-item-subtitle">${customer.name}</span>
 											<i class="fa fa-info-circle" id="customer_info_btn" style="position: absolute; right: 0; top: 0; padding: 5px; color: var(--text-light); cursor: pointer; font-size: 16px;"></i>
 										</div>
 									`
-											: '<span style="color: #9ca3af;">Select Customer...</span>'
-									}
+				: '<span style="color: #9ca3af;">Select Customer...</span>'
+			}
 								</div>
 							</div>
 						</div>
 
-						${
-							customer
-								? `
+						${customer
+				? `
 							<div class="row mb-3 shipping-address-container">
 								<div class="col-md-12 form-group">
 									<label>Shipping Address</label>
 									<div id="address_field" class="form-control custom-field" style="width: 100%;" tabindex="0">
-										${
-											shipping_address
-												? `
+										${shipping_address
+					? `
 											<div style="display: flex; flex-direction: column;">
 												<div style="display: flex; align-items: center; gap: 8px;">
 													<span class="modal-item-title">${shipping_address}</span>
@@ -326,38 +323,38 @@ class SalesInvoiceApp {
 												</div>
 												<span class="modal-item-subtitle">
 													${[
-														shipping_addresses.find(
-															(a) => a.name === shipping_address
-														)?.address_line1,
-														shipping_addresses.find(
-															(a) => a.name === shipping_address
-														)?.address_line2,
-														shipping_addresses.find(
-															(a) => a.name === shipping_address
-														)?.city,
-														shipping_addresses.find(
-															(a) => a.name === shipping_address
-														)?.state,
-														shipping_addresses.find(
-															(a) => a.name === shipping_address
-														)?.pincode,
-														shipping_addresses.find(
-															(a) => a.name === shipping_address
-														)?.country,
-													]
-														.filter(Boolean)
-														.join(", ")}
+						shipping_addresses.find(
+							(a) => a.name === shipping_address
+						)?.address_line1,
+						shipping_addresses.find(
+							(a) => a.name === shipping_address
+						)?.address_line2,
+						shipping_addresses.find(
+							(a) => a.name === shipping_address
+						)?.city,
+						shipping_addresses.find(
+							(a) => a.name === shipping_address
+						)?.state,
+						shipping_addresses.find(
+							(a) => a.name === shipping_address
+						)?.pincode,
+						shipping_addresses.find(
+							(a) => a.name === shipping_address
+						)?.country,
+					]
+						.filter(Boolean)
+						.join(", ")}
 												</span>
 											</div>
 										`
-												: '<span style="color: #9ca3af;">Select Shipping Address...</span>'
-										}
+					: '<span style="color: #9ca3af;">Select Shipping Address...</span>'
+				}
 									</div>
 								</div>
 							</div>
 						`
-								: ""
-						}
+				: ""
+			}
 						<!-- Items Table -->
 						<div class="items-table-container">
 							<div class="table-head">
@@ -369,34 +366,29 @@ class SalesInvoiceApp {
 							</div>
 							<div id="item-rows">
 								${items
-									.map(
-										(item, index) => `
+				.map(
+					(item, index) => `
 									<div class="item-row" data-index="${index}">
 										<div class="item-field custom-field" data-index="${index}" tabindex="0">
-											<span style="color: ${item.item_name ? "inherit" : "#9ca3af"};">${
-											item.item_name || "Select Item..."
-										}</span>
+											<span style="color: ${item.item_name ? "inherit" : "#9ca3af"};">${item.item_name || "Select Item..."
+						}</span>
 										</div>
-										<div class="batch-field custom-field" data-index="${index}" tabindex="0" style="background: ${
-											item.item_code ? "inherit" : "#f9fafb"
-										};">
-											<span style="color: ${item.batch_no ? "inherit" : "#9ca3af"};">${
-											item.batch_no || "Batch..."
-										}</span>
+										<div class="batch-field custom-field" data-index="${index}" tabindex="0" style="background: ${item.item_code ? "inherit" : "#f9fafb"
+						};">
+											<span style="color: ${item.batch_no ? "inherit" : "#9ca3af"};">${item.batch_no || "Batch..."
+						}</span>
 										</div>
-										<input type="number" class="qty-input" data-index="${index}" value="${item.qty}" placeholder="0" ${
-											!item.item_code ? "disabled" : ""
-										}>
-										<input type="number" class="rate-input" data-index="${index}" value="${
-											item.rate
-										}" placeholder="0.00" ${!item.item_code ? "disabled" : ""}>
+										<input type="number" class="qty-input" data-index="${index}" value="${item.qty}" placeholder="0" ${!item.item_code ? "disabled" : ""
+						}>
+										<input type="number" class="rate-input" data-index="${index}" value="${item.rate
+						}" placeholder="0.00" ${!item.item_code ? "disabled" : ""}>
 										<input type="number" class="amount-display" data-index="${index}" value="${item.total_amount.toFixed(
-											2
-										)}" readonly tabindex="-1">
+							2
+						)}" readonly tabindex="-1">
 									</div>
 								`
-									)
-									.join("")}
+				)
+				.join("")}
 							</div>
 						</div>
 
@@ -410,31 +402,30 @@ class SalesInvoiceApp {
 								</div>
 								<div id="tax_rows">
 									${this.state.taxes
-										.map(
-											(tax) => `
+				.map(
+					(tax) => `
 										<div class="total-row">
 											<span>${tax.description}</span>
 											<span>₹${(tax.tax_amount || 0).toFixed(2)}</span>
 										</div>
 									`
-										)
-										.join("")}
+				)
+				.join("")}
 								</div>
-								<div class="total-row" id="rounding_row" style="display: ${
-									this.state.rounding_adjustment ? "flex" : "none"
-								};">
+								<div class="total-row" id="rounding_row" style="display: ${this.state.rounding_adjustment ? "flex" : "none"
+			};">
 									<span>Rounding Adjustment</span>
 									<span>₹<span id="rounding_adjustment">${(this.state.rounding_adjustment || 0).toFixed(
-										2
-									)}</span></span>
+				2
+			)}</span></span>
 								</div>
 								<div class="total-row grand-total">
 									<span>Grand Total</span>
 									<span>₹<span id="grand_total">${(
-										this.state.rounded_total ||
-										this.state.grand_total ||
-										this.calculateSubtotal()
-									).toFixed(2)}</span></span>
+				this.state.rounded_total ||
+				this.state.grand_total ||
+				this.calculateSubtotal()
+			).toFixed(2)}</span></span>
 								</div>
 							</div>
 						</div>
@@ -481,9 +472,8 @@ class SalesInvoiceApp {
 						<button class="btn btn-primary btn-save-new" style="padding: 12px;" ${saving ? "disabled" : ""}>
 							<i class="fa fa-plus"></i> ${saving ? "Saving..." : "Save & Create New"}
 						</button>
-						<button class="btn btn-secondary btn-save-close" style="padding: 12px;" ${
-							saving ? "disabled" : ""
-						}>
+						<button class="btn btn-secondary btn-save-close" style="padding: 12px;" ${saving ? "disabled" : ""
+				}>
 							<i class="fa fa-check"></i> ${saving ? "Saving..." : "Save & Close"}
 						</button>
 					</div>
@@ -495,7 +485,10 @@ class SalesInvoiceApp {
 			<div class="custom-modal-overlay">
 				<div class="custom-modal-content" style="max-width: 500px; padding-top: 10px;">
 					<div class="modal-header">
-						<h3 style="margin: 0; font-size: 16px;">Customer Details</h3>
+						<div style="display: flex; align-items: baseline; gap: 10px;">
+							<h3 style="margin: 0; font-size: 16px;">Customer Details</h3>
+							<span style="font-size: 11px; color: #777; font-weight: normal;"><kbd>Shift+Left</kbd> Back</span>
+						</div>
 						<button class="modal-close btn-secondary" style="padding: 2px 8px; border: none;">&times;</button>
 					</div>
 					<div class="modal-body" style="padding: 20px;">
@@ -534,10 +527,9 @@ class SalesInvoiceApp {
 						</table>
 
 						<!-- Other Details -->
-						${
-							this.state.customer.custom_drug_lic_no ||
-							this.state.customer.custom_msme
-								? `
+						${this.state.customer.custom_drug_lic_no ||
+					this.state.customer.custom_msme
+					? `
 							<h4 style="margin: 0 0 10px; font-size: 14px; font-weight: 600;">Other Details</h4>
 							<table class="table table-bordered" style="margin: 0; font-size: 13px; margin-bottom: 15px;">
 								<tbody>
@@ -552,8 +544,8 @@ class SalesInvoiceApp {
 								</tbody>
 							</table>
 						`
-								: ""
-						}
+					: ""
+				}
 
 						<!-- Addresses -->
 						<h4 style="margin: 0 0 10px; font-size: 14px; font-weight: 600;">Addresses</h4>
@@ -568,11 +560,10 @@ class SalesInvoiceApp {
 									</tr>
 								</thead>
 								<tbody>
-									${
-										(this.state.shipping_addresses || []).length > 0
-											? this.state.shipping_addresses
-													.map(
-														(addr) => `
+									${(this.state.shipping_addresses || []).length > 0
+					? this.state.shipping_addresses
+						.map(
+							(addr) => `
 											<tr>
 												<td>${addr.name}</td>
 												<td>
@@ -581,25 +572,23 @@ class SalesInvoiceApp {
 												</td>
 												<td>${addr.gstin || "-"}</td>
 												<td style="text-align: center; vertical-align: middle;">
-													<i class="fa fa-eye btn-view-address" data-name="${
-														addr.name
-													}" style="cursor: pointer; color: var(--primary-color);"></i>
+													<i class="fa fa-eye btn-view-address" data-name="${addr.name
+								}" style="cursor: pointer; color: var(--primary-color);"></i>
 												</td>
 											</tr>
 										`
-													)
-													.join("")
-											: '<tr><td colspan="4" style="text-align: center; color: #999;">No addresses found</td></tr>'
-									}
+						)
+						.join("")
+					: '<tr><td colspan="4" style="text-align: center; color: #999;">No addresses found</td></tr>'
+				}
 								</tbody>
 							</table>
 						</div>
 						<div style="text-align: right; margin-top: 15px; border-top: 1px solid var(--border-color); padding-top: 15px;">
-							${
-								this.state.returnToModal === "customer"
-									? `<button class="btn btn-secondary btn-back-customer-list" style="font-size: 12px;">Back to List</button>`
-									: ""
-							}
+							${this.state.returnToModal === "customer"
+					? `<button class="btn btn-secondary btn-back-customer-list" style="font-size: 12px;">Back to List</button>`
+					: ""
+				}
 						</div>
 					</div>
 				</div>
@@ -613,7 +602,10 @@ class SalesInvoiceApp {
 			<div class="custom-modal-overlay">
 				<div class="custom-modal-content" style="max-width: 500px; padding-top: 10px;">
 					<div class="modal-header">
-						<h3 style="margin: 0; font-size: 16px;">Address Details - ${addr.name}</h3>
+						<div style="display: flex; align-items: baseline; gap: 10px;">
+							<h3 style="margin: 0; font-size: 16px;">Address Details - ${addr.name}</h3>
+							<span style="font-size: 11px; color: #777; font-weight: normal;"><kbd>Shift+Left</kbd> Back</span>
+						</div>
 						<button class="modal-close btn-secondary" style="padding: 2px 8px; border: none;">&times;</button>
 					</div>
 					<div class="modal-body" style="padding: 20px;">
@@ -666,13 +658,12 @@ class SalesInvoiceApp {
 							</tbody>
 						</table>
 						<div style="text-align: right; margin-top: 15px;">
-							${
-								this.state.returnToModal === "customer_details"
-									? `<button class="btn btn-secondary btn-back-customer" style="font-size: 12px;">Back to Customer</button>`
-									: this.state.returnToModal === "address"
-									? `<button class="btn btn-secondary btn-back-address-list" style="font-size: 12px;">Back to List</button>`
-									: ""
-							}
+							${this.state.returnToModal === "customer_details"
+					? `<button class="btn btn-secondary btn-back-customer" style="font-size: 12px;">Back to Customer</button>`
+					: this.state.returnToModal === "address"
+						? `<button class="btn btn-secondary btn-back-address-list" style="font-size: 12px;">Back to List</button>`
+						: ""
+				}
 						</div>
 					</div>
 				</div>
@@ -683,10 +674,15 @@ class SalesInvoiceApp {
 			<div class="custom-modal-overlay">
 				<div class="custom-modal-content">
 					<div class="modal-header">
-						<h3 style="margin: 0; font-size: 16px;">${title}</h3>
-						<button class="modal-close btn-secondary" style="padding: 2px 8px; border: none; ${
-							activeModal === "sales_account" ? "display:none;" : ""
-						}">&times;</button>
+						<div style="display: flex; align-items: baseline; gap: 10px;">
+							<h3 style="margin: 0; font-size: 16px;">${title}</h3>
+							${["customer", "address"].includes(activeModal)
+				? `<span style="font-size: 11px; color: #777; font-weight: normal;"><kbd>Shift+Enter</kbd> View Details</span>`
+				: ""
+			}
+						</div>
+						<button class="modal-close btn-secondary" style="padding: 2px 8px; border: none; ${activeModal === "sales_account" ? "display:none;" : ""
+			}">&times;</button>
 					</div>
 					<div style="padding: 15px; border-bottom: 1px solid var(--border-color);">
 						<input type="text" id="modal_search" class="form-control" style="width: 100%;" value="${searchTerm}" placeholder="Search..." autofocus>
@@ -740,26 +736,23 @@ class SalesInvoiceApp {
 			.map((item, index) => {
 				const isSelected = index === selectedModalIndex;
 				if (activeModal === "customer") {
-					return `<div class="modal-item ${
-						isSelected ? "selected" : ""
-					}" data-index="${index}" style="position: relative; padding-right: 30px;">
+					return `<div class="modal-item ${isSelected ? "selected" : ""
+						}" data-index="${index}" style="position: relative; padding-right: 30px;">
 					<div class="modal-item-title">${item.customer_name}</div>
 					<div class="modal-item-subtitle">${item.name}</div>
 					<i class="fa fa-info-circle modal-item-info-btn" data-index="${index}" style="position: absolute; right: 10px; top: 12px; color: var(--text-light); cursor: pointer; z-index: 10; font-size: 16px;"></i>
 				</div>`;
 				} else if (activeModal === "item") {
-					return `<div class="modal-item ${
-						isSelected ? "selected" : ""
-					}" data-index="${index}">
+					return `<div class="modal-item ${isSelected ? "selected" : ""
+						}" data-index="${index}">
 					<div class="modal-item-title">${item.item_name}</div>
 					<div class="modal-item-subtitle">${item.name} | ₹${item.standard_rate || 0}</div>
 				</div>`;
 				} else if (activeModal === "batch") {
 					const qty = parseFloat(item.actual_qty) || 0;
 					const statusClass = qty <= 5 ? "stock-badge-red" : "stock-badge-green";
-					return `<div class="modal-item batch-item ${
-						isSelected ? "selected" : ""
-					}" data-index="${index}">
+					return `<div class="modal-item batch-item ${isSelected ? "selected" : ""
+						}" data-index="${index}">
 					<div class="modal-item-info">
 						<div class="modal-item-title">${item.name}</div>
 					</div>
@@ -768,9 +761,8 @@ class SalesInvoiceApp {
 					</div>
 				</div>`;
 				} else if (activeModal === "address") {
-					return `<div class="modal-item ${
-						isSelected ? "selected" : ""
-					}" data-index="${index}" style="position: relative; padding-right: 30px;">
+					return `<div class="modal-item ${isSelected ? "selected" : ""
+						}" data-index="${index}" style="position: relative; padding-right: 30px;">
 					<div class="modal-item-title">${item.name}</div>
 					<div class="modal-item-subtitle">
 						${[item.address_line1, item.address_line2, item.city, item.state, item.pincode, item.country]
@@ -780,9 +772,8 @@ class SalesInvoiceApp {
 					<i class="fa fa-info-circle modal-item-info-btn" data-index="${index}" style="position: absolute; right: 10px; top: 12px; color: var(--text-light); cursor: pointer; z-index: 10; font-size: 16px;"></i>
 				</div>`;
 				} else if (activeModal === "sales_account") {
-					return `<div class="modal-item ${
-						isSelected ? "selected" : ""
-					}" data-index="${index}">
+					return `<div class="modal-item ${isSelected ? "selected" : ""
+						}" data-index="${index}">
 					<div class="modal-item-title">${item.account_name}</div>
 					<div class="modal-item-subtitle">${item.name}</div>
 				</div>`;
@@ -831,7 +822,16 @@ class SalesInvoiceApp {
 
 		// Attach keydown directly to address field for modal opening
 		container.find("#address_field").on("keydown", (e) => {
-			if (e.key === "Enter" || e.key === " ") {
+			if (e.shiftKey && e.key === "Enter") {
+				e.preventDefault();
+				e.stopPropagation();
+				this.setState({
+					activeModal: "address_details",
+					viewAddressId: this.state.shipping_address,
+					returnToModal: null,
+					focusAfterClose: "#address_field",
+				});
+			} else if (e.key === "Enter" || e.key === " ") {
 				e.preventDefault();
 				e.stopPropagation(); // Stop global handler
 				this.setState({ activeModal: "address", searchTerm: "", selectedModalIndex: 0 });
@@ -868,7 +868,24 @@ class SalesInvoiceApp {
 		});
 
 		container.find("#customer_field").on("keydown", (e) => {
-			if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+			if (e.shiftKey && e.key === "Enter") {
+				e.preventDefault();
+				e.stopPropagation();
+				if (this.state.customer) {
+					// Ensure we have addresses loaded for the details view
+					if (
+						!this.state.shipping_addresses ||
+						this.state.shipping_addresses.length === 0
+					) {
+						this.loadShippingAddresses(this.state.customer.name);
+						this.loadShippingAddresses(this.state.customer.name);
+					}
+					this.setState({
+						activeModal: "customer_details",
+						focusAfterClose: "#customer_field",
+					});
+				}
+			} else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
 				e.preventDefault();
 				// If Sales Account modal is open, let modal handle it, otherwise navigate back
 				if (!this.state.activeModal) {
@@ -1089,6 +1106,22 @@ class SalesInvoiceApp {
 						this.handleModalKeyDown(e);
 						return;
 					}
+
+					// Shift+Left for Back
+					if (e.shiftKey && e.key === "ArrowLeft") {
+						// Only capture if in details modal to avoid blocking text selection in search inputs
+						if (["address_details", "customer_details"].includes(this.state.activeModal)) {
+							this.handleModalBack(e);
+							return;
+						}
+					}
+
+					// Alt+X for Close
+					if (e.altKey && e.key.toLowerCase() === "x") {
+						e.preventDefault();
+						this.setState({ activeModal: null });
+						return;
+					}
 				}
 
 				// Enter handling for navigation (except when selecting in search)
@@ -1292,6 +1325,26 @@ class SalesInvoiceApp {
 			this.state.selectedModalIndex = newIndex;
 			this.renderModalResults();
 			this.scrollToSelected();
+		} else if (e.shiftKey && e.key === "Enter") {
+			e.preventDefault();
+			const item = list[selectedModalIndex];
+			if (item) {
+				if (activeModal === "customer") {
+					this.state.customer = item;
+					// Ensure we have addresses loaded for the details view
+					this.loadShippingAddresses(item.name);
+					this.setState({
+						activeModal: "customer_details",
+						returnToModal: "customer",
+					});
+				} else if (activeModal === "address") {
+					this.setState({
+						activeModal: "address_details",
+						viewAddressId: item.name,
+						returnToModal: "address",
+					});
+				}
+			}
 		} else if (e.key === "Enter") {
 			e.preventDefault();
 			if (list.length > 0) {
@@ -1300,6 +1353,31 @@ class SalesInvoiceApp {
 		} else if (e.key === "Escape") {
 			e.preventDefault();
 			this.setState({ activeModal: null });
+		}
+	}
+
+	handleModalBack(e) {
+		e.preventDefault();
+		const { activeModal, returnToModal, detailsParentReturn } = this.state;
+
+		if (activeModal === "address_details" && returnToModal === "customer_details") {
+			// specifically returning to customer details, restore context
+			this.setState({
+				activeModal: "customer_details",
+				returnToModal: detailsParentReturn,
+			});
+		} else if (
+			["address_details", "customer_details"].includes(activeModal) &&
+			returnToModal
+		) {
+			this.setState({ activeModal: returnToModal });
+		} else {
+			// Default back behavior: Close the modal (return to form)
+			const focusSelector = this.state.focusAfterClose;
+			this.setState({ activeModal: null, focusAfterClose: null });
+			if (focusSelector) {
+				setTimeout(() => $(this.container).find(focusSelector).focus(), 100);
+			}
 		}
 	}
 
